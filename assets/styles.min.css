@@ -145,7 +145,7 @@
     .hero-bg {
       position: absolute;
       inset: 0;
-      background-image: url('background fss.jpg');
+      background-image: url('background fss.png');
       background-size: cover;
       background-position: center;
       opacity: 1;
@@ -205,7 +205,7 @@
     .hero-title-wrap {
       display: block;
       width: 100%;
-      background: var(--red);
+      background: linear-gradient(135deg, #0a1628 0%, #152240 40%, #1a3060 100%);
       padding: 20px 40px;
       text-align: center;
       position: relative;
@@ -213,8 +213,8 @@
     }
     .hero-title {
       font-family: 'Sora', sans-serif;
-      font-size: clamp(0.8rem, 1.75vw, 1.3rem);
-      font-weight: 800;
+      font-size: clamp(0.65rem, 1.4vw, 1rem);
+      font-weight: 400;
       line-height: 1.18;
       letter-spacing: -0.01em;
       margin-bottom: 0;
@@ -386,7 +386,7 @@
       background:
         radial-gradient(ellipse 60% 100% at 100% 50%, rgba(254,6,59,0.07) 0%, transparent 60%),
         linear-gradient(rgba(5,10,25,0.55), rgba(5,10,25,0.55)),
-        url('background fss.jpg') center/cover;
+        url('background fss.png') center/cover;
       padding: 48px 0;
       border-top: 1px solid rgba(255,255,255,0.07);
       border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -441,17 +441,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
       overflow: hidden;
       padding: 0;
       height: 44px;
       width: auto;
       flex-shrink: 0;
-      transition: border-color 0.2s, background 0.2s;
     }
-    .logo-box:hover { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); }
+    .logo-box:hover { }
     .logo-box img {
       width: auto;
       height: 100%;
@@ -1095,12 +1094,7 @@
 
     /* ── Wizard Modal (3-step form) ──────────── */
     .modal--wizard { max-width: 520px; padding: 0; border-radius: 16px; overflow: hidden; }
-    .modal--wizard .modal-close {
-      top: 12px; right: 14px; z-index: 10;
-      color: rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.15);
-      background: rgba(255,255,255,0.06);
-    }
-    .modal--wizard .modal-close:hover { color: #fff; background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
+    .modal--wizard .modal-close { display: none; }
     .wizard-header {
       background: #0d0d0d; padding: 20px 24px 14px; color: #fff;
     }
@@ -1171,6 +1165,7 @@
       content: ''; width: 10px; height: 10px; border-radius: 50%;
       background: var(--red); transform: scale(0); transition: transform 0.2s;
     }
+    .radio-card:has(input:checked) { border-color: var(--red); background: rgba(254,6,59,0.04); }
     .radio-card input:checked ~ .radio-circle { border-color: var(--red); }
     .radio-card input:checked ~ .radio-circle::after { transform: scale(1); }
     .radio-card input:checked ~ span:last-child { font-weight: 600; }
@@ -1208,18 +1203,44 @@
 
     /* ── Fixed Bottom Bar ────────────────────── */
     .fixed-bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      z-index: 99; background: rgba(10,10,10,0.95);
-      backdrop-filter: blur(10px);
-      border-top: 1px solid rgba(255,255,255,0.07);
-      padding: 12px 20px;
-      transform: translateY(0);
-      transition: transform 0.35s ease, opacity 0.35s ease;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+      position: fixed; bottom: 20px; left: 0; right: 0;
+      z-index: 99;
+      padding: 0;
+      display: flex; justify-content: center;
+      pointer-events: none;
     }
-    .fixed-bottom-bar.hidden { transform: translateY(100%); opacity: 0; pointer-events: none; }
-    .fixed-bottom-bar__inner { max-width: 600px; margin: 0 auto; display: flex; justify-content: center; }
-    .fixed-bottom-bar__btn { width: 100%; max-width: 400px; text-align: center; justify-content: center; }
+    .fixed-bottom-bar__inner {
+      display: inline-flex; align-items: center; gap: 0;
+      background: var(--red);
+      border-radius: 50px;
+      padding: 6px 6px 6px 24px;
+      box-shadow: 0 6px 24px rgba(254,6,59,0.4), 0 2px 8px rgba(0,0,0,0.2);
+      pointer-events: all;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .fixed-bottom-bar__inner:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(254,6,59,0.5), 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .fixed-bottom-bar__text {
+      color: #fff; font-size: 0.88rem; font-weight: 500;
+      white-space: nowrap; margin-right: 14px;
+    }
+    .fixed-bottom-bar__btn {
+      background: #fff; color: var(--red);
+      font-family: 'Sora', sans-serif; font-weight: 700;
+      padding: 12px 22px; border-radius: 50px; white-space: nowrap;
+      font-size: 0.82rem; letter-spacing: 0.04em;
+      box-shadow: none; transition: background 0.2s;
+    }
+    .fixed-bottom-bar__btn:hover {
+      background: #f5f5f5; color: var(--red-dark); transform: none; box-shadow: none;
+    }
+    @media (max-width: 420px) {
+      .fixed-bottom-bar__inner { padding: 5px 5px 5px 16px; }
+      .fixed-bottom-bar__text { font-size: 0.78rem; margin-right: 10px; }
+      .fixed-bottom-bar__btn { padding: 10px 16px; font-size: 0.75rem; }
+    }
 
     /* ══════════════════════════════════════════════
        RESPONSIVE
