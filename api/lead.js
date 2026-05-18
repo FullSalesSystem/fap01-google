@@ -15,19 +15,12 @@ const ALLOWED_CARGOS = new Set([
 ]);
 
 const ALLOWED_SEGMENTOS = new Set([
-  'servico',
-  'varejo',
-  'mentoria',
-  'industria',
-  'ecommerce',
-  'educacao',
-  'imobiliaria',
-  'financas',
-  'franquia',
   'saude',
-  'saas',
-  'telecom',
-  'turismo',
+  'financas',
+  'juridico',
+  'tecnologia-saas',
+  'industria',
+  'servicos-mentoria',
   'outro',
 ]);
 
@@ -40,6 +33,49 @@ const ALLOWED_RECEITAS = new Set([
   '500k-1m',
   'acima-1m',
 ]);
+
+const ALLOWED_DORES = new Set([
+  'estrela',
+  'processo',
+  'playbooks',
+  'captacao',
+  'trafego',
+]);
+
+const DOR_LABELS = {
+  estrela: 'Resultado depende de 1-2 vendedores estrela',
+  processo: 'Sem processo replicável — contratação demora pra render',
+  playbooks: 'Sem playbooks — rotinas, SOPs e documentação não existem',
+  captacao: 'Captação ativa é improviso (sem prospecção / social selling)',
+  trafego: 'Tráfego pago é caixa-preta (sem CPL, CAC, conversão por canal)',
+};
+
+const SEGMENTO_LABELS = {
+  saude: 'Saúde',
+  financas: 'Finanças',
+  juridico: 'Jurídico',
+  'tecnologia-saas': 'Tecnologia/SaaS',
+  industria: 'Indústria',
+  'servicos-mentoria': 'Serviços/Mentoria',
+  outro: 'Outro',
+};
+
+const CARGO_LABELS = {
+  'socio-empresario': 'Sócio / Empresário',
+  'gerente-lider': 'Gerente / Líder',
+  'colaborador-funcionario': 'Colaborador',
+  'prestador-freelancer': 'Freelancer',
+};
+
+const RECEITA_LABELS = {
+  'abaixo-30k': 'Abaixo de R$ 30 mil',
+  '30k-50k': 'Entre R$ 30 mil e R$ 50 mil',
+  '50k-100k': 'Entre R$ 50 mil e R$ 100 mil',
+  '100k-300k': 'Entre R$ 100 mil e R$ 300 mil',
+  '300k-500k': 'Entre R$ 300 mil e R$ 500 mil',
+  '500k-1m': 'Entre R$ 500 mil e R$ 1 milhão',
+  'acima-1m': 'Acima de R$ 1 milhão',
+};
 
 function json(res, status, data) {
   res.statusCode = status;
@@ -82,6 +118,7 @@ function validatePayload(input) {
     cargo: sanitizeText(input.cargo, 40),
     segmento: sanitizeText(input.segmento, 40),
     receita: sanitizeText(input.receita, 40),
+    dor: sanitizeText(input.dor, 40),
     utm_source: sanitizeText(input.utm_source, 120),
     utm_medium: sanitizeText(input.utm_medium, 120),
     utm_campaign: sanitizeText(input.utm_campaign, 200),
@@ -98,6 +135,7 @@ function validatePayload(input) {
   if (!ALLOWED_CARGOS.has(payload.cargo)) return null;
   if (!ALLOWED_SEGMENTOS.has(payload.segmento)) return null;
   if (!ALLOWED_RECEITAS.has(payload.receita)) return null;
+  if (!ALLOWED_DORES.has(payload.dor)) return null;
 
   return payload;
 }
@@ -235,6 +273,64 @@ async function searchContactOpportunities(ghlBaseUrl, pitToken, locationId, cont
   return data.opportunities;
 }
 
+function buildNoteBody(payload) {
+  const classificacao = classifyLead(payload.cargo, payload.receita);
+  const lines = [
+    'Respostas FAP01 — Sessão Estratégica',
+    '',
+    `• Travamento: ${DOR_LABELS[payload.dor] || payload.dor}`,
+    `• Segmento: ${SEGMENTO_LABELS[payload.segmento] || payload.segmento}`,
+    `• Perfil: ${CARGO_LABELS[payload.cargo] || payload.cargo}`,
+    `• Receita mensal: ${RECEITA_LABELS[payload.receita] || payload.receita}`,
+    '',
+    `Classificação: ${classificacao}`,
+    `Página: ${payload.page}`,
+    `Enviado em: ${payload.submitted_at}`,
+  ];
+
+  const utmEntries = [
+    payload.utm_source && `source=${payload.utm_source}`,
+    payload.utm_medium && `medium=${payload.utm_medium}`,
+    payload.utm_campaign && `campaign=${payload.utm_campaign}`,
+    payload.utm_content && `content=${payload.utm_content}`,
+    payload.utm_term && `term=${payload.utm_term}`,
+  ].filter(Boolean);
+
+  if (utmEntries.length) {
+    lines.push('', `UTMs: ${utmEntries.join(' | ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+async function addContactNote(ghlBaseUrl, pitToken, contactId, userId, body) {
+  const endpoint = `${ghlBaseUrl.replace(/\/+$/, '')}/contacts/${contactId}/notes`;
+  const payload = userId ? { userId, body } : { body };
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${pitToken}`,
+      Accept: 'application/json',
+      Version: '2021-07-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    console.error('[ghl] note failed', {
+      status: response.status,
+      hasUserId: Boolean(userId),
+      error: errorBody.slice(0, 500),
+    });
+  } else {
+    console.log('[ghl] note ok', { status: response.status });
+  }
+
+  return response.ok;
+}
+
 async function addContactTags(ghlBaseUrl, pitToken, contactId, tags) {
   const endpoint = `${ghlBaseUrl.replace(/\/+$/, '')}/contacts/${contactId}/tags`;
   const response = await fetch(endpoint, {
@@ -316,6 +412,7 @@ async function handler(req, res) {
   const pitToken = process.env.GHL_PIT_TOKEN;
   const locationId = process.env.GHL_LOCATION_ID;
   const ghlBaseUrl = process.env.GHL_BASE_URL || 'https://services.leadconnectorhq.com';
+  const ghlUserId = process.env.GHL_USER_ID || '';
   if (!pitToken || !locationId) return json(res, 500, { error: 'server_not_configured' });
 
   const payload = validatePayload(req.body || {});
@@ -354,6 +451,12 @@ async function handler(req, res) {
 
     if (contactId) {
       await updateContactSource(ghlBaseUrl, pitToken, contactId);
+      try {
+        const noteUserId = ghlUserId || data?.contact?.assignedTo || '';
+        await addContactNote(ghlBaseUrl, pitToken, contactId, noteUserId, buildNoteBody(payload));
+      } catch (err) {
+        console.error('[ghl] note threw', { message: err && err.message });
+      }
       const opportunities = await searchContactOpportunities(ghlBaseUrl, pitToken, locationId, contactId);
       const hasCloserOpportunity = opportunities.some((op) => op.pipelineId === CLOSERS_PIPELINE_ID);
 

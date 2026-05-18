@@ -38,3 +38,5 @@ Aplicar em **Production** (e Preview se quiser testar branch).
 - Conferir se as env vars estão preenchidas no ambiente correto (Production).
 - Conferir logs da função em **Vercel -> Functions -> api/lead**.
 - Verificar se o domínio publicado está apontando para o projeto/branch corretos.
+
+<!-- redeploy: pick up env vars -->

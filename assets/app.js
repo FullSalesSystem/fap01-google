@@ -150,9 +150,12 @@ var wizardCurrentStep = 1;
       var whatsapp = '+' + pais + ' ' + whatsappDigits;
       var cargoEl = document.querySelector('input[name="cargo"]:checked');
       var cargo = cargoEl ? cargoEl.value : '';
-      var segmento = document.getElementById('f-segmento').value;
+      var segmentoEl = document.querySelector('input[name="segmento"]:checked');
+      var segmento = segmentoEl ? segmentoEl.value : '';
       var receitaEl = document.querySelector('input[name="receita"]:checked');
       var receita = receitaEl ? receitaEl.value : '';
+      var dorEl = document.querySelector('input[name="dor"]:checked');
+      var dor = dorEl ? dorEl.value : '';
       var websiteTrap = document.getElementById('f-website').value;
       var submitElapsed = Date.now() - formOpenedAt;
 
@@ -177,9 +180,9 @@ var wizardCurrentStep = 1;
 
       var redirectUrl;
       if (isEligibleCargo && isHighRevenue) {
-        redirectUrl = 'https://fap01-obrigado.fullsalessystem.com';
+        redirectUrl = 'https://fap01-calendly.fullsalessystem.com';
       } else if (isEligibleCargo && isSemiRevenue) {
-        redirectUrl = 'https://fap01-obrigado-semi.fullsalessystem.com';
+        redirectUrl = 'https://fap01-calendly-semi.fullsalessystem.com';
       } else {
         redirectUrl = 'https://fap01-obrigado-lf.fullsalessystem.com';
       }
@@ -208,6 +211,7 @@ var wizardCurrentStep = 1;
         cargo: cargo,
         segmento: segmento,
         receita: receita,
+        dor: dor,
         utm_source: utms.utm_source,
         utm_medium: utms.utm_medium,
         utm_campaign: utms.utm_campaign,
@@ -313,20 +317,19 @@ var wizardCurrentStep = 1;
       });
     })();
 
-    // Wizard 3-step navigation
+    // Wizard 4-step navigation
     function wizardGoTo(step, instant) {
-      var steps = [1, 2, 3];
+      var totalSteps = 4;
       var tabs = document.querySelectorAll('.wizard-tab');
       var stepLabel = document.querySelector('.wizard-step-label');
       var btnNext = document.getElementById('wizard-btn-next');
       var btnBack = document.getElementById('wizard-btn-back');
 
-      steps.forEach(function(s) {
+      for (var s = 1; s <= totalSteps; s++) {
         var el = document.getElementById('wizard-step-' + s);
-        if (!el) return;
-        if (s === step) { el.hidden = false; }
-        else { el.hidden = true; }
-      });
+        if (!el) continue;
+        el.hidden = (s !== step);
+      }
 
       tabs.forEach(function(tab) {
         var ts = parseInt(tab.getAttribute('data-step'));
@@ -335,33 +338,38 @@ var wizardCurrentStep = 1;
         else if (ts < step) tab.classList.add('completed');
       });
 
-      if (stepLabel) stepLabel.textContent = 'Passo ' + step + ' de 3';
+      if (stepLabel) stepLabel.textContent = 'Passo ' + step + ' de ' + totalSteps;
       if (btnBack) btnBack.style.display = step > 1 ? '' : 'none';
 
-      if (step === 3) {
-        btnNext.textContent = '';
+      if (step === totalSteps) {
+        btnNext.style.display = '';
         btnNext.innerHTML = 'Enviar aplicação <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>';
-        btnNext.setAttribute('data-action', 'submit');
       } else {
-        btnNext.innerHTML = 'Continuar <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>';
-        btnNext.setAttribute('data-action', 'next');
+        btnNext.style.display = 'none';
       }
 
       wizardCurrentStep = step;
     }
 
+    // Auto-advance on radio selection (steps 1-3)
+    document.querySelectorAll('input[name="segmento"]').forEach(function(r) {
+      r.addEventListener('change', function() {
+        setTimeout(function() { wizardGoTo(2); }, 350);
+      });
+    });
+    document.querySelectorAll('input[name="cargo"]').forEach(function(r) {
+      r.addEventListener('change', function() {
+        setTimeout(function() { wizardGoTo(3); }, 350);
+      });
+    });
+    document.querySelectorAll('input[name="receita"]').forEach(function(r) {
+      r.addEventListener('change', function() {
+        setTimeout(function() { wizardGoTo(4); }, 350);
+      });
+    });
+
     document.getElementById('wizard-btn-next').addEventListener('click', function() {
-      if (wizardCurrentStep === 1) {
-        var cargo = document.querySelector('input[name="cargo"]:checked');
-        var segmento = document.getElementById('f-segmento');
-        if (!cargo) { alert('Selecione seu cargo.'); return; }
-        if (!segmento.value) { segmento.reportValidity(); return; }
-        wizardGoTo(2);
-      } else if (wizardCurrentStep === 2) {
-        var receita = document.querySelector('input[name="receita"]:checked');
-        if (!receita) { alert('Selecione a faixa de receita.'); return; }
-        wizardGoTo(3);
-      } else if (wizardCurrentStep === 3) {
+      if (wizardCurrentStep === 4) {
         var nome = document.getElementById('f-nome');
         var email = document.getElementById('f-email');
         var whatsapp = document.getElementById('f-whatsapp');
@@ -433,29 +441,15 @@ var wizardCurrentStep = 1;
       });
     })();
 
-    // Fixed bottom bar - hide when native CTA buttons are visible
+    // Fixed bottom bar - always visible
     (function() {
-      var bar = document.getElementById('fixed-bottom-bar');
-      if (!bar) return;
-      var allBtns = document.querySelectorAll('.btn--red');
-      var targets = [];
-      allBtns.forEach(function(btn) {
-        if (!btn.closest('.fixed-bottom-bar') && !btn.closest('.navbar') && !btn.closest('.modal')) targets.push(btn);
-      });
-      var visibleSet = new Set();
-      var ctaObserver = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-          if (entry.isIntersecting) visibleSet.add(entry.target);
-          else visibleSet.delete(entry.target);
+      var cta = document.getElementById('fixed-bar-cta');
+      if (cta) {
+        cta.addEventListener('click', function(e) {
+          e.preventDefault();
+          openModal();
         });
-        if (visibleSet.size > 0) bar.classList.add('hidden');
-        else bar.classList.remove('hidden');
-      }, { threshold: 0.1, rootMargin: '0px 0px -80px 0px' });
-      targets.forEach(function(btn) { ctaObserver.observe(btn); });
-      document.getElementById('fixed-bar-cta').addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal();
-      });
+      }
     })();
 
 // Exit Popup - dispara 1x por visita
