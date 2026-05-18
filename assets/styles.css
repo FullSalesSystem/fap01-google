@@ -1194,11 +1194,63 @@
     .wizard-secure {
       text-align: center; font-size: 0.7rem; color: #999; margin-top: 4px;
     }
+    /* ── Wizard mobile (≤768px) ─────────────── */
+    @media (max-width: 768px) {
+      .modal-backdrop { padding: 8px; }
+      .modal--wizard { border-radius: 14px; }
+
+      .wizard-header,
+      .wizard-header.v2-wizard-header { padding: 12px 14px 10px !important; }
+      .wizard-brand { font-size: 0.82rem; margin-bottom: 10px; }
+      .v2-wizard-progress { margin-bottom: 8px; }
+      .v2-progress-track { margin-bottom: 10px; }
+
+      .wizard-meta { font-size: 0.66rem; margin-top: 8px; }
+
+      .wizard-body { padding: 14px 14px 12px; }
+      .wizard-step-tag { display: none; }
+      .wizard-step-title { font-size: 1.02rem; line-height: 1.25; }
+      .wizard-step-desc { font-size: 0.8rem; line-height: 1.4; margin-bottom: 12px; }
+
+      .radio-grid { gap: 6px; }
+      .radio-list { gap: 5px; }
+      .radio-card { padding: 10px 12px; font-size: 0.82rem; line-height: 1.35; }
+      .radio-circle { width: 16px; height: 16px; }
+      .radio-circle::after { width: 8px; height: 8px; }
+
+      .wizard-info-box { padding: 10px 12px; }
+      .wizard-info-box p { font-size: 0.8rem; }
+
+      .form-field label { font-size: 0.68rem; }
+      .form-field input,
+      .form-field select { padding: 10px 12px; font-size: 16px; }
+      .phone-input-wrapper #f-country-code,
+      .phone-input-wrapper #f-whatsapp { padding: 10px 12px; font-size: 16px; }
+
+      .wizard-btn-main { padding: 12px; font-size: 0.95rem; }
+      .wizard-btn-back { font-size: 0.85rem; padding: 4px 6px; }
+      .wizard-secure { font-size: 0.66rem; }
+    }
+
+    /* ── Wizard small screens (≤500px) ───────── */
     @media (max-width: 500px) {
       .radio-grid { grid-template-columns: 1fr; }
-      .wizard-header { padding: 16px 18px 10px; }
-      .wizard-body { padding: 20px 18px 16px; }
-      .wizard-step-title { font-size: 1.1rem; }
+
+      .modal-backdrop { padding: 6px; }
+      .modal--wizard { border-radius: 12px; }
+
+      .wizard-header,
+      .wizard-header.v2-wizard-header { padding: 10px 12px 8px !important; }
+      .wizard-brand { margin-bottom: 8px; }
+
+      .wizard-meta { margin-top: 6px; }
+
+      .wizard-body { padding: 12px 12px 10px; }
+      .wizard-step-title { font-size: 0.98rem; }
+      .wizard-step-desc { font-size: 0.78rem; margin-bottom: 10px; }
+
+      .radio-card { padding: 9px 11px; font-size: 0.8rem; }
+      .wizard-info-box { padding: 9px 11px; }
     }
 
     /* ── Fixed Bottom Bar ────────────────────── */
