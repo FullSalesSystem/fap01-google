@@ -108,12 +108,6 @@
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
       </a>
 
-      <div class="v2-hero-urgency v2-hero-urgency--top">
-        <span><span class="urgency-dot urgency-dot--green"></span> <strong>20 vagas</strong> por estrategista/semana</span>
-        <span><span class="urgency-dot"></span> Resposta em <strong>4h úteis</strong></span>
-        <span><span class="urgency-dot"></span> Conversa <strong>1:1</strong> com estrategista</span>
-      </div>
-
       <!-- Vídeo -->
       <div class="hero-video v2-hero-video" id="ifr_673683322eb080000b6db91f_wrapper">
         <div style="padding:56.25% 0 0 0;position:relative;" id="ifr_673683322eb080000b6db91f_aspect">
@@ -893,37 +887,32 @@
     <button class="modal-close" id="modal-close-btn" aria-label="Fechar">×</button>
 
     <div class="wizard-header v2-wizard-header">
-      <div class="wizard-brand">FULL SALES</div>
 
       <div class="v2-wizard-progress">
         <div class="v2-progress-track"><div class="v2-progress-fill" id="v2-progress-fill"></div></div>
         <div class="wizard-tabs v2-wizard-tabs">
           <button type="button" class="wizard-tab active" data-step="1">
             <span class="v2-tab-num">1</span>
-            <span class="v2-tab-label">Travamento</span>
+            <span class="v2-tab-label">Segmento</span>
           </button>
           <button type="button" class="wizard-tab" data-step="2">
             <span class="v2-tab-num">2</span>
-            <span class="v2-tab-label">Segmento</span>
+            <span class="v2-tab-label">Perfil</span>
           </button>
           <button type="button" class="wizard-tab" data-step="3">
             <span class="v2-tab-num">3</span>
-            <span class="v2-tab-label">Perfil</span>
+            <span class="v2-tab-label">Receita</span>
           </button>
           <button type="button" class="wizard-tab" data-step="4">
             <span class="v2-tab-num">4</span>
-            <span class="v2-tab-label">Receita</span>
-          </button>
-          <button type="button" class="wizard-tab" data-step="5">
-            <span class="v2-tab-num">5</span>
             <span class="v2-tab-label">Contato</span>
           </button>
         </div>
       </div>
 
       <div class="wizard-meta">
-        <span class="wizard-step-label">Passo 1 de 5</span>
-        <span class="wizard-time">~ 90 segundos</span>
+        <span class="wizard-step-label">Passo 1 de 4</span>
+        <span class="wizard-time">~ 60 segundos</span>
       </div>
     </div>
 
@@ -931,44 +920,9 @@
       <form id="modal-form">
         <input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;pointer-events:none;">
 
-        <!-- Step 1: Travamento (engajamento) -->
+        <!-- Step 1: Segmento -->
         <div class="wizard-step" id="wizard-step-1">
-          <div class="wizard-step-tag">Passo 1 de 5 · seu travamento</div>
-          <h2 class="wizard-step-title">Qual destes é o seu maior travamento hoje?</h2>
-          <p class="wizard-step-desc">Onde está a maior alavanca de receita parada na sua operação?</p>
-
-          <div class="radio-list">
-            <label class="radio-card radio-card--full">
-              <input type="radio" name="dor" value="estrela">
-              <span class="radio-circle"></span>
-              <span>Resultado depende de <strong>1-2 vendedores estrela</strong></span>
-            </label>
-            <label class="radio-card radio-card--full">
-              <input type="radio" name="dor" value="processo">
-              <span class="radio-circle"></span>
-              <span>Sem <strong>processo replicável</strong> — contratação demora pra render</span>
-            </label>
-            <label class="radio-card radio-card--full">
-              <input type="radio" name="dor" value="playbooks">
-              <span class="radio-circle"></span>
-              <span>Sem <strong>playbooks</strong> — rotinas, SOPs e documentação não existem</span>
-            </label>
-            <label class="radio-card radio-card--full">
-              <input type="radio" name="dor" value="captacao">
-              <span class="radio-circle"></span>
-              <span><strong>Captação ativa é improviso</strong> (sem prospecção / social selling)</span>
-            </label>
-            <label class="radio-card radio-card--full">
-              <input type="radio" name="dor" value="trafego">
-              <span class="radio-circle"></span>
-              <span><strong>Tráfego pago é caixa-preta</strong> (sem CPL, CAC, conversão por canal)</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Step 2: Segmento -->
-        <div class="wizard-step" id="wizard-step-2" hidden>
-          <div class="wizard-step-tag">Passo 2 de 5 · segmento</div>
+          <div class="wizard-step-tag">Passo 1 de 4 · segmento</div>
           <h2 class="wizard-step-title">Qual o segmento da sua empresa?</h2>
           <p class="wizard-step-desc">Selecione a opção que melhor representa seu negócio.</p>
 
@@ -1011,9 +965,9 @@
           </div>
         </div>
 
-        <!-- Step 3: Perfil / Cargo -->
-        <div class="wizard-step" id="wizard-step-3" hidden>
-          <div class="wizard-step-tag">Passo 3 de 5 · perfil</div>
+        <!-- Step 2: Perfil / Cargo -->
+        <div class="wizard-step" id="wizard-step-2" hidden>
+          <div class="wizard-step-tag">Passo 2 de 4 · perfil</div>
           <h2 class="wizard-step-title">Qual é o seu papel hoje na empresa?</h2>
           <p class="wizard-step-desc">Pra personalizar seu diagnóstico — falamos diferente com sócio do que com gerente.</p>
 
@@ -1041,9 +995,9 @@
           </div>
         </div>
 
-        <!-- Step 4: Qualificação / Receita -->
-        <div class="wizard-step" id="wizard-step-4" hidden>
-          <div class="wizard-step-tag">Passo 4 de 5 · qualificação</div>
+        <!-- Step 3: Qualificação / Receita -->
+        <div class="wizard-step" id="wizard-step-3" hidden>
+          <div class="wizard-step-tag">Passo 3 de 4 · qualificação</div>
           <h2 class="wizard-step-title">Qual a receita média mensal da empresa?</h2>
           <p class="wizard-step-desc">A análise muda completamente em cada faixa. Sem julgamento — só pra te entregar o diagnóstico certo.</p>
 
@@ -1086,9 +1040,9 @@
           </div>
         </div>
 
-        <!-- Step 5: Seus dados -->
-        <div class="wizard-step" id="wizard-step-5" hidden>
-          <div class="wizard-step-tag">Passo 5 de 5 · contato</div>
+        <!-- Step 4: Seus dados -->
+        <div class="wizard-step" id="wizard-step-4" hidden>
+          <div class="wizard-step-tag">Passo 4 de 4 · contato</div>
           <h2 class="wizard-step-title">Quase lá — onde a gente te encontra?</h2>
 
           <div class="wizard-info-box">
@@ -1126,11 +1080,6 @@
         </div>
 
         <div class="wizard-footer">
-          <div class="wizard-urgency">
-            <span><span class="urgency-dot"></span> 20 vagas por estrategista/semana</span>
-            <span><span class="urgency-dot"></span> Resposta em até 4h úteis</span>
-            <span><span class="urgency-dot"></span> Sem compromisso</span>
-          </div>
           <button type="button" id="wizard-btn-next" class="btn btn--red btn--full wizard-btn-main">
             Continuar <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
           </button>
