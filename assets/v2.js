@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var TOTAL_STEPS = 5;
+  var TOTAL_STEPS = 4;
   var currentStep = 1;
 
   /* ─── LAZY LOAD VÍDEO ────────────────────────────────────── */
@@ -158,7 +158,7 @@
 
   /* ─── VALIDAÇÃO ──────────────────────────────────────────── */
   function validateStep(step) {
-    var map = { 1: 'dor', 2: 'segmento', 3: 'cargo', 4: 'receita' };
+    var map = { 1: 'segmento', 2: 'cargo', 3: 'receita' };
     if (map[step] && form) {
       if (!form.querySelector('input[name="' + map[step] + '"]:checked')) {
         return false;
@@ -205,15 +205,20 @@
     return el ? el.value.trim() : '';
   }
 
-  /* ─── FIXED BAR — aparece quando pain section entra no viewport */
-  var painSection = document.querySelector('.v2-pain-section') ||
-                    document.querySelector('.pain-section');
-  if (painSection && 'IntersectionObserver' in window) {
+  /* ─── FIXED BAR — aparece a partir da 2ª seção (logos)
+       Esconde de volta enquanto o hero (1ª seção) estiver visível. */
+  var triggerSection = document.querySelector('.logos-section');
+  if (triggerSection && 'IntersectionObserver' in window) {
     new IntersectionObserver(function (entries) {
-      if (entries[0].isIntersecting) {
-        document.body.classList.add('v2-show-bar');
-      }
-    }, { threshold: 0.05 }).observe(painSection);
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          document.body.classList.add('v2-show-bar');
+        } else if (entry.boundingClientRect.top > 0) {
+          /* trigger ainda abaixo do viewport → usuário voltou ao hero */
+          document.body.classList.remove('v2-show-bar');
+        }
+      });
+    }, { threshold: 0.01 }).observe(triggerSection);
   }
 
   /* ─── FAQ ACCORDION ──────────────────────────────────────── */
