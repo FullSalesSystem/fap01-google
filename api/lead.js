@@ -135,7 +135,9 @@ function validatePayload(input) {
   if (!ALLOWED_CARGOS.has(payload.cargo)) return null;
   if (!ALLOWED_SEGMENTOS.has(payload.segmento)) return null;
   if (!ALLOWED_RECEITAS.has(payload.receita)) return null;
-  if (!ALLOWED_DORES.has(payload.dor)) return null;
+  /* dor (travamento) virou opcional — etapa removida do formulário.
+     Se vier preenchido, precisa ser válido; vazio é aceito. */
+  if (payload.dor && !ALLOWED_DORES.has(payload.dor)) return null;
 
   return payload;
 }
@@ -278,7 +280,11 @@ function buildNoteBody(payload) {
   const lines = [
     'Respostas FAP01 — Sessão Estratégica',
     '',
-    `• Travamento: ${DOR_LABELS[payload.dor] || payload.dor}`,
+  ];
+  if (payload.dor) {
+    lines.push(`• Travamento: ${DOR_LABELS[payload.dor] || payload.dor}`);
+  }
+  lines.push(
     `• Segmento: ${SEGMENTO_LABELS[payload.segmento] || payload.segmento}`,
     `• Perfil: ${CARGO_LABELS[payload.cargo] || payload.cargo}`,
     `• Receita mensal: ${RECEITA_LABELS[payload.receita] || payload.receita}`,
@@ -286,7 +292,7 @@ function buildNoteBody(payload) {
     `Classificação: ${classificacao}`,
     `Página: ${payload.page}`,
     `Enviado em: ${payload.submitted_at}`,
-  ];
+  );
 
   const utmEntries = [
     payload.utm_source && `source=${payload.utm_source}`,
@@ -415,8 +421,25 @@ async function handler(req, res) {
   const ghlUserId = process.env.GHL_USER_ID || '';
   if (!pitToken || !locationId) return json(res, 500, { error: 'server_not_configured' });
 
-  const payload = validatePayload(req.body || {});
-  if (!payload) return json(res, 400, { error: 'invalid_payload' });
+  /* req.body normalmente já vem parseado pelo Vercel quando o
+     Content-Type é application/json. Mas sendBeacon (usado para
+     sobreviver ao redirect) pode entregar como string ou Buffer
+     em algumas runtimes — defensivo. */
+  let rawBody = req.body;
+  if (typeof rawBody === 'string') {
+    try { rawBody = JSON.parse(rawBody); } catch (_) { rawBody = {}; }
+  } else if (rawBody && typeof rawBody === 'object' && Buffer.isBuffer(rawBody)) {
+    try { rawBody = JSON.parse(rawBody.toString('utf8')); } catch (_) { rawBody = {}; }
+  }
+
+  const payload = validatePayload(rawBody || {});
+  if (!payload) {
+    console.warn('[lead] invalid payload', {
+      bodyType: typeof req.body,
+      keys: rawBody && typeof rawBody === 'object' ? Object.keys(rawBody) : null,
+    });
+    return json(res, 400, { error: 'invalid_payload' });
+  }
 
   console.log('[lead] utms received', {
     utm_source: payload.utm_source,
@@ -424,6 +447,7 @@ async function handler(req, res) {
     utm_campaign: payload.utm_campaign,
     utm_content: payload.utm_content,
     utm_term: payload.utm_term,
+    page: payload.page.slice(0, 200),
   });
 
   const supabaseUrl = process.env.SUPABASE_URL;
