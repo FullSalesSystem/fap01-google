@@ -1045,36 +1045,69 @@
     font-size: 16px !important;
   }
 
-  /* ── Rodapé FIXO na base do modal — botão sempre visível ── */
+  /* ── Rodapé sticky · selo segurança ACIMA + botões lado a lado ──
+     [back ←] ............................ [Continuar →]
+     - .wizard-secure visualmente em cima via flex order
+     - back icon-only à esquerda (margin-right: auto empurra primário)
+     - primário com largura natural à direita
+     - especificidade .wizard-footer .form-actions .wizard-btn-main
+       (3 classes) vence .btn--full (1 classe) ── */
   .wizard-footer {
     position: sticky !important;
     bottom: 0 !important;
     flex: 0 0 auto !important;
     background: #fff !important;
-    padding: 10px 0 14px !important;
+    padding: 8px 14px 12px !important;
     margin-top: auto !important;
     box-shadow: 0 -10px 16px -8px rgba(0, 0, 0, 0.12) !important;
-  }
-  .wizard-btn-main {
-    padding: 15px !important;
-    font-size: 1.08rem !important;
-    border-radius: 12px !important;
-    min-height: 52px !important;
-    font-weight: 700 !important;
-  }
-  .wizard-btn-main svg { width: 20px !important; height: 20px !important; }
-  .wizard-btn-main:disabled { opacity: 0.85; }
-  .wizard-btn-back {
-    font-size: 0.95rem !important;
-    padding: 10px !important;
-    min-height: 44px !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   .wizard-secure {
-    font-size: 0.8rem !important;
-    margin-top: 8px !important;
-    gap: 6px !important;
+    order: -1 !important;
+    font-size: 0.72rem !important;
+    margin: 0 0 8px !important;
+    gap: 5px !important;
   }
-  .wizard-secure svg { width: 15px !important; height: 15px !important; }
+  .wizard-secure svg { width: 12px !important; height: 12px !important; }
+
+  .form-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+    margin: 0 !important;
+  }
+  .wizard-footer .form-actions .wizard-btn-main {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    padding: 10px 20px !important;
+    font-size: 0.9rem !important;
+    min-height: 0 !important;
+    white-space: normal !important;
+    line-height: 1.2 !important;
+    text-transform: none !important;
+    font-weight: 700 !important;
+    border-radius: 10px !important;
+  }
+  .wizard-footer .form-actions .wizard-btn-main svg {
+    width: 14px !important;
+    height: 14px !important;
+    flex-shrink: 0;
+  }
+  .wizard-btn-main:disabled { opacity: 0.85; }
+  .wizard-footer .form-actions .wizard-btn-back {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    padding: 9px 12px !important;
+    font-size: 0.85rem !important;
+    border-radius: 8px !important;
+    gap: 0 !important;
+    margin-right: auto !important;
+    min-height: 0 !important;
+  }
+  .wizard-footer .form-actions .wizard-btn-back svg { width: 16px !important; height: 16px !important; }
+  .wizard-footer .form-actions .wizard-btn-back span { display: none !important; }
 }
 
 /* ── Refinamentos para telas pequenas (≤500px) ── */
@@ -1118,10 +1151,13 @@
     padding: 13px 14px !important;
     min-height: 48px !important;
   }
-  .wizard-btn-main {
-    padding: 14px !important;
-    font-size: 1.05rem !important;
-    min-height: 50px !important;
+  /* especificidade casando com a regra do ≤768 */
+  .wizard-footer .form-actions .wizard-btn-main {
+    padding: 9px 16px !important;
+    font-size: 0.85rem !important;
+  }
+  .wizard-footer .form-actions .wizard-btn-back {
+    padding: 8px 10px !important;
   }
 }
 
@@ -1629,3 +1665,25 @@ body.v2-show-bar .fixed-bottom-bar.hidden {
   color: var(--text-muted);
   margin-bottom: 18px;
 }
+
+/* ── Campo condicional do wizard (ex.: Instagram p/ receita 50k+) ── */
+.form-field[hidden] { display: none !important; }
+
+/* ── Wrapper dos botões do wizard ──
+   Desktop: empilhado com o primário em cima (column-reverse — o back vem
+   primeiro no DOM pra virar linha [← Voltar] ... [Continuar →] no mobile). */
+.form-actions { display: flex; flex-direction: column-reverse; }
+
+/* ── Ajustes mobile dos pop-ups ── */
+@media (max-width: 768px) {
+  /* rodapé sticky mais baixo: urgência em 1 linha, sem o 3º item */
+  .wizard-urgency { gap: 10px !important; margin-bottom: 8px !important; flex-wrap: nowrap !important; white-space: nowrap; }
+  .wizard-urgency span:nth-child(3) { display: none !important; }
+
+  /* info-box do passo de contato mais enxuto (o passo ganhou o campo de Instagram) */
+  .wizard-info-box { padding: 12px 14px !important; margin-bottom: 12px !important; }
+  .wizard-info-box p { font-size: 0.88rem !important; line-height: 1.45 !important; }
+}
+
+/* exit popup nunca estoura a tela (celulares baixos) */
+#exit-popup { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; }

@@ -1,6 +1,5 @@
 var THIRD_PARTY_LOADED = false;
 var GTAG_ID = 'AW-11465446145';
-var CONVERTE_PLAYER_ID = '673683322eb080000b6db91f';
 
 function loadScript(src, attrs) {
   var script = document.createElement('script');
@@ -24,9 +23,6 @@ function bootThirdParty() {
   window.gtag('config', GTAG_ID);
 
   loadScript('https://www.googletagmanager.com/gtag/js?id=' + GTAG_ID);
-  loadScript('https://scripts.converteai.net/lib/js/smartplayer/v1/sdk.min.js', {
-    'data-id': CONVERTE_PLAYER_ID
-  });
 }
 
 function scheduleThirdPartyBoot() {
@@ -41,48 +37,25 @@ function scheduleThirdPartyBoot() {
   });
 }
 
-function initLazyHeroVideo() {
-  var iframe = document.getElementById('ifr_673683322eb080000b6db91f');
-  if (!iframe || !iframe.dataset || !iframe.dataset.src) return;
-
-  function activateVideo() {
-    if (iframe.dataset.loaded === '1') return;
-    iframe.src = iframe.dataset.src;
-    iframe.dataset.loaded = '1';
-    bootThirdParty();
-  }
-
-  var wrapper = document.getElementById('ifr_673683322eb080000b6db91f_wrapper') || iframe;
-  if ('IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          activateVideo();
-          io.disconnect();
-        }
-      });
-    }, { rootMargin: '200px 0px' });
-    io.observe(wrapper);
-  } else {
-    activateVideo();
-  }
-
-  ['pointerdown', 'keydown', 'touchstart'].forEach(function (eventName) {
-    window.addEventListener(eventName, activateVideo, { once: true, passive: true });
-  });
-}
-
 var formOpenedAt = Date.now();
 
     // Modal
-var wizardCurrentStep = 1;
-
     function openModal() {
       document.getElementById('modal').classList.add('open');
       document.body.style.overflow = 'hidden';
       bootThirdParty();
       formOpenedAt = Date.now();
-      wizardGoTo(1, true);
+      // ponte da vitrine de depoimentos: setor tocado pré-marca o segmento (só se nada foi escolhido)
+      try {
+        var segSalvo = sessionStorage.getItem('fss_segmento');
+        if (segSalvo && !document.querySelector('input[name="segmento"]:checked')) {
+          var radio = document.querySelector('input[name="segmento"][value="' + segSalvo + '"]');
+          if (radio) radio.checked = true;
+        }
+      } catch (e) { /* storage indisponível */ }
+      syncInstagramField();
+      /* navegação do wizard mora no v2.js — reseta pro passo 1 por lá */
+      if (window.__v2WizardOpen) window.__v2WizardOpen();
     }
     function closeModal() {
       document.getElementById('modal').classList.remove('open');
@@ -106,6 +79,74 @@ var wizardCurrentStep = 1;
 
     function digitsOnly(value) {
       return String(value || '').replace(/\D/g, '');
+    }
+
+    /* ── Telefone internacional (modo "+") ────────────────────────
+       Se o PRIMEIRO caractere digitado no WhatsApp for "+", o campo
+       vira modo internacional livre: aceita +, dígitos e espaços,
+       sem máscara BR e ignorando o select de país. Normaliza pra
+       "+CC NUMERO". CC (código do país, ITU): 1 e 7 têm 1 dígito;
+       conjunto fechado de 2 dígitos; o resto tem 3. */
+    var CC_1DIGIT = { '1': 1, '7': 1 };
+    var CC_2DIGIT = {
+      '20': 1, '27': 1, '30': 1, '31': 1, '32': 1, '33': 1, '34': 1, '36': 1, '39': 1,
+      '40': 1, '41': 1, '43': 1, '44': 1, '45': 1, '46': 1, '47': 1, '48': 1, '49': 1,
+      '51': 1, '52': 1, '53': 1, '54': 1, '55': 1, '56': 1, '57': 1, '58': 1,
+      '60': 1, '61': 1, '62': 1, '63': 1, '64': 1, '65': 1, '66': 1,
+      '81': 1, '82': 1, '84': 1, '86': 1,
+      '90': 1, '91': 1, '92': 1, '93': 1, '94': 1, '95': 1, '98': 1
+    };
+
+    function isIntlPhoneMode(raw) {
+      return String(raw || '').trim().charAt(0) === '+';
+    }
+
+    /* "+351 912345678" | "+351912345678" → { cc:'351', num:'912345678',
+       full:'+351 912345678' }. Null quando não está no modo "+" ou o
+       número (sem CC) foge de 8-15 dígitos. */
+    function normalizeIntlPhone(raw) {
+      var v = String(raw || '').trim();
+      if (v.charAt(0) !== '+') return null;
+      if (!/^\+[\d\s]+$/.test(v)) return null;
+      var digits = v.slice(1).replace(/\D/g, '');
+      var cc;
+      if (CC_1DIGIT[digits.slice(0, 1)]) cc = digits.slice(0, 1);
+      else if (CC_2DIGIT[digits.slice(0, 2)]) cc = digits.slice(0, 2);
+      else cc = digits.slice(0, 3);
+      var num = digits.slice(cc.length);
+      if (!cc || num.length < 8 || num.length > 15) return null;
+      return { cc: cc, num: num, full: '+' + cc + ' ' + num };
+    }
+    /* v2.js reusa a mesma regra (validação do passo 6 e beacon de parcial) */
+    window.__fssIntlPhone = normalizeIntlPhone;
+
+    // Instagram só é perguntado pra quem fatura acima de R$ 50 mil/mês
+    var INSTAGRAM_RECEITAS = ['50k-100k', '100k-300k', '300k-500k', '500k-1m', 'acima-1m'];
+
+    function instagramFieldVisible() {
+      var box = document.getElementById('field-instagram');
+      return Boolean(box && !box.hidden);
+    }
+
+    function syncInstagramField() {
+      var box = document.getElementById('field-instagram');
+      var input = document.getElementById('f-instagram');
+      if (!box || !input) return;
+      var receitaEl = document.querySelector('input[name="receita"]:checked');
+      var show = Boolean(receitaEl && INSTAGRAM_RECEITAS.indexOf(receitaEl.value) !== -1);
+      box.hidden = !show;
+      input.required = show;
+    }
+
+    // Aceita "@fulano", "fulano" ou o link do perfil; devolve "@fulano"
+    function normalizeInstagram(value) {
+      var v = sanitizeText(value, 80)
+        .replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')
+        .replace(/[?#/].*$/, '')
+        .replace(/\s+/g, '')
+        .replace(/^@+/, '');
+      if (!v) return '';
+      return /^[A-Za-z0-9._]{1,30}$/.test(v) ? '@' + v : sanitizeText(value, 60);
     }
 
     function safeRedirect(url) {
@@ -132,7 +173,47 @@ var wizardCurrentStep = 1;
       }
     }
 
+    /* Click IDs (Meta/Google) pra atribuição offline via CAPI / Enhanced
+       Conversions. Mesmo padrão sessionStorage das UTMs: se a URL já foi
+       "limpa" antes do lead abrir o modal, o valor original persiste. */
+    /* gad_source e gad_campaignid vêm junto do gclid em anúncios Google
+       modernos (Search/Display/YouTube) — mesma leitura da URL. */
+    var CLICK_ID_KEYS = ['fbclid', 'gclid', 'gbraid', 'wbraid', 'gad_source', 'gad_campaignid'];
+    var CLICK_ID_STORAGE_KEY = 'fap01_click_ids';
+
+    function captureClickIds() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var stored = {};
+        try { stored = JSON.parse(sessionStorage.getItem(CLICK_ID_STORAGE_KEY) || '{}'); } catch (_) {}
+        var merged = {};
+        CLICK_ID_KEYS.forEach(function (k) {
+          var v = params.get(k);
+          merged[k] = (v && v.length) ? v.slice(0, 512) : (stored[k] || '');
+        });
+        try { sessionStorage.setItem(CLICK_ID_STORAGE_KEY, JSON.stringify(merged)); } catch (_) {}
+        return merged;
+      } catch (_) {
+        return { fbclid: '', gclid: '', gbraid: '', wbraid: '', gad_source: '', gad_campaignid: '' };
+      }
+    }
+
+    function readCookie(name) {
+      try {
+        var re = new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)');
+        var m = document.cookie.match(re);
+        return m ? decodeURIComponent(m[1]) : '';
+      } catch (_) { return ''; }
+    }
+
+    /* _fbc e _fbp são setados pelo Pixel Meta. Lidos no submit — em localhost
+       podem vir vazios (Pixel só cria em domínio real); em prod existem. */
+    function readMetaCookies() {
+      return { fbc: readCookie('_fbc'), fbp: readCookie('_fbp') };
+    }
+
     captureUtms();
+    captureClickIds();
 
     function createSubmissionId() {
       if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -141,13 +222,105 @@ var wizardCurrentStep = 1;
       return 'lead_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     }
 
+    /* ── CAPTURA EM DUAS FASES ─────────────────────────────────
+       Fase 1: ao concluir o WhatsApp (antes da etapa do Instagram),
+       o lead já vai inteiro pro /api/lead — se a pessoa abandonar no
+       Instagram, o lead NÃO se perde. Fase 2: o envio final manda só
+       o @ pro /api/lead-instagram, que atualiza contato + linha. */
+    var leadCapturado = null; // { submission_id, submitted_at, email, whatsapp }
+
+    function coletarContato() {
+      var phoneRaw = document.getElementById('f-whatsapp').value;
+      var intl = normalizeIntlPhone(phoneRaw); // null fora do modo "+" ou inválido
+      var pais = document.getElementById('f-country-code').value;
+      /* modo "+" inválido → digits vazio: reprova nos checks de 8-15 */
+      var digits = isIntlPhoneMode(phoneRaw)
+        ? (intl ? intl.num : '')
+        : digitsOnly(phoneRaw);
+      return {
+        nome: sanitizeText(document.getElementById('f-nome').value, 120),
+        email: sanitizeText(document.getElementById('f-email').value, 254).toLowerCase(),
+        whatsappDigits: digits,
+        whatsapp: intl ? intl.full : '+' + pais + ' ' + digits,
+      };
+    }
+
+    /* Chamado pelo v2.js ao avançar do WhatsApp pra etapa do Instagram.
+       Retorna true quando o lead foi (ou já tinha sido) capturado. */
+    window.__fap01PreInstagram = function () {
+      var c = coletarContato();
+      if (document.getElementById('f-website').value) return false;      // honeypot
+      if (Date.now() - formOpenedAt < 1800) return false;                // rápido demais (bot)
+      if (!isValidEmail(c.email)) return false;
+      if (c.whatsappDigits.length < 8 || c.whatsappDigits.length > 15) return false;
+
+      /* voltou, trocou contato e seguiu de novo → captura de novo com os dados atuais */
+      if (leadCapturado && leadCapturado.email === c.email && leadCapturado.whatsapp === c.whatsapp) {
+        return true;
+      }
+
+      var cargoEl = document.querySelector('input[name="cargo"]:checked');
+      var segmentoEl = document.querySelector('input[name="segmento"]:checked');
+      var receitaEl = document.querySelector('input[name="receita"]:checked');
+      var utms = captureUtms();
+      var clickIds = captureClickIds();
+      var metaCookies = readMetaCookies();
+      var submissionId = createSubmissionId();
+      var submittedAt = new Date().toISOString();
+
+      var payload = {
+        submission_id: submissionId,
+        submitted_at: submittedAt,
+        page: window.location.href,
+        nome: c.nome,
+        email: c.email,
+        whatsapp: c.whatsapp,
+        cargo: cargoEl ? cargoEl.value : '',
+        segmento: segmentoEl ? segmentoEl.value : '',
+        receita: receitaEl ? receitaEl.value : '',
+        dor: '',
+        instagram: '',
+        utm_source: utms.utm_source,
+        utm_medium: utms.utm_medium,
+        utm_campaign: utms.utm_campaign,
+        utm_content: utms.utm_content,
+        utm_term: utms.utm_term,
+        fbclid: clickIds.fbclid,
+        gclid: clickIds.gclid,
+        gbraid: clickIds.gbraid,
+        wbraid: clickIds.wbraid,
+        gad_source: clickIds.gad_source,
+        gad_campaignid: clickIds.gad_campaignid,
+        fbc: metaCookies.fbc,
+        fbp: metaCookies.fbp,
+        lead_timestamp: submittedAt,
+      };
+
+      leadCapturado = { submission_id: submissionId, submitted_at: submittedAt, email: c.email, whatsapp: c.whatsapp };
+
+      try {
+        fetch('/api/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(function () {});
+      } catch (_) {}
+
+      return true;
+    };
+
     function handleFormSubmit(e) {
       e.preventDefault();
       var nome     = sanitizeText(document.getElementById('f-nome').value, 120);
       var email    = sanitizeText(document.getElementById('f-email').value, 254).toLowerCase();
       var pais     = document.getElementById('f-country-code').value;
-      var whatsappDigits = digitsOnly(document.getElementById('f-whatsapp').value);
-      var whatsapp = '+' + pais + ' ' + whatsappDigits;
+      var phoneRaw = document.getElementById('f-whatsapp').value;
+      var intl     = normalizeIntlPhone(phoneRaw); // null fora do modo "+" ou inválido
+      var whatsappDigits = isIntlPhoneMode(phoneRaw)
+        ? (intl ? intl.num : '')
+        : digitsOnly(phoneRaw);
+      var whatsapp = intl ? intl.full : '+' + pais + ' ' + whatsappDigits;
       var cargoEl = document.querySelector('input[name="cargo"]:checked');
       var cargo = cargoEl ? cargoEl.value : '';
       var segmentoEl = document.querySelector('input[name="segmento"]:checked');
@@ -156,6 +329,8 @@ var wizardCurrentStep = 1;
       var receita = receitaEl ? receitaEl.value : '';
       var dorEl = document.querySelector('input[name="dor"]:checked');
       var dor = dorEl ? dorEl.value : '';
+      var instagramInput = document.getElementById('f-instagram');
+      var instagram = (instagramFieldVisible() && instagramInput) ? normalizeInstagram(instagramInput.value) : '';
       var websiteTrap = document.getElementById('f-website').value;
       var submitElapsed = Date.now() - formOpenedAt;
 
@@ -170,6 +345,9 @@ var wizardCurrentStep = 1;
       }
       if (whatsappDigits.length < 8 || whatsappDigits.length > 15) {
         return alert('Informe um WhatsApp valido.');
+      }
+      if (instagramFieldVisible() && !instagram) {
+        return alert('Informe o @ do seu Instagram.');
       }
 
       var isEligibleCargo = (cargo === 'socio-empresario');
@@ -188,6 +366,9 @@ var wizardCurrentStep = 1;
       }
 
       var utms = captureUtms();
+      var clickIds = captureClickIds();
+      var metaCookies = readMetaCookies();
+      var submittedAtIso = new Date().toISOString();
 
       var redirectParams = new URLSearchParams({
         nome: nome,
@@ -195,15 +376,22 @@ var wizardCurrentStep = 1;
         whatsapp: whatsapp,
         cargo: cargo,
         segmento: segmento,
-        receita: receita
+        receita: receita,
+        dor: dor
       });
+      if (instagram) redirectParams.set('instagram', instagram);
       UTM_KEYS.forEach(function(k) {
         if (utms[k]) redirectParams.set(k, utms[k]);
+      });
+      /* Click IDs seguem pra próxima página (Calendly/obrigado) pra permitir
+         que o Pixel/Google Tag da landing final gere eventos correlacionados. */
+      CLICK_ID_KEYS.forEach(function(k) {
+        if (clickIds[k]) redirectParams.set(k, clickIds[k]);
       });
 
       var payload = {
         submission_id: submissionId,
-        submitted_at: new Date().toISOString(),
+        submitted_at: submittedAtIso,
         page: window.location.href,
         nome: nome,
         email: email,
@@ -212,18 +400,51 @@ var wizardCurrentStep = 1;
         segmento: segmento,
         receita: receita,
         dor: dor,
+        instagram: instagram,
         utm_source: utms.utm_source,
         utm_medium: utms.utm_medium,
         utm_campaign: utms.utm_campaign,
         utm_content: utms.utm_content,
-        utm_term: utms.utm_term
+        utm_term: utms.utm_term,
+        fbclid: clickIds.fbclid,
+        gclid: clickIds.gclid,
+        gbraid: clickIds.gbraid,
+        wbraid: clickIds.wbraid,
+        gad_source: clickIds.gad_source,
+        gad_campaignid: clickIds.gad_campaignid,
+        fbc: metaCookies.fbc,
+        fbp: metaCookies.fbp,
+        lead_timestamp: submittedAtIso,
       };
 
-      var request = fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      /* Fase 2: se o lead já foi capturado antes da etapa do Instagram,
+         o envio final só ATUALIZA o contato/linha com o @ (evita duplicar). */
+      var request;
+      if (leadCapturado) {
+        if (instagram) {
+          request = fetch('/api/lead-instagram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              submission_id: leadCapturado.submission_id,
+              submitted_at: leadCapturado.submitted_at,
+              page: window.location.href,
+              email: leadCapturado.email,
+              whatsapp: leadCapturado.whatsapp,
+              instagram: instagram,
+            }),
+            keepalive: true,
+          });
+        } else {
+          request = Promise.resolve();
+        }
+      } else {
+        request = fetch('/api/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
 
       Promise.race([
         request,
@@ -311,75 +532,24 @@ var wizardCurrentStep = 1;
       countrySelect.addEventListener('change', updatePlaceholder);
 
       phoneInput.addEventListener('input', function(e) {
+        var raw = e.target.value.replace(/^\s+/, '');
+        /* Primeiro caractere "+": modo internacional livre — sem máscara.
+           Aceita só +, dígitos e espaços (regra única dos funis FSS). */
+        if (raw.charAt(0) === '+') {
+          var clean = '+' + raw.slice(1).replace(/[^\d ]/g, '').replace(/ {2,}/g, ' ');
+          if (clean !== e.target.value) e.target.value = clean;
+          return;
+        }
         var m = getMask(countrySelect.value);
-        var d = e.target.value.replace(/\D/g, '').substring(0, m.max);
+        var d = raw.replace(/\D/g, '').substring(0, m.max);
         e.target.value = d.length === 0 ? '' : m.fmt(d);
       });
     })();
 
-    // Wizard 4-step navigation
-    function wizardGoTo(step, instant) {
-      var totalSteps = 4;
-      var tabs = document.querySelectorAll('.wizard-tab');
-      var stepLabel = document.querySelector('.wizard-step-label');
-      var btnNext = document.getElementById('wizard-btn-next');
-      var btnBack = document.getElementById('wizard-btn-back');
-
-      for (var s = 1; s <= totalSteps; s++) {
-        var el = document.getElementById('wizard-step-' + s);
-        if (!el) continue;
-        el.hidden = (s !== step);
-      }
-
-      tabs.forEach(function(tab) {
-        var ts = parseInt(tab.getAttribute('data-step'));
-        tab.classList.remove('active', 'completed');
-        if (ts === step) tab.classList.add('active');
-        else if (ts < step) tab.classList.add('completed');
-      });
-
-      if (stepLabel) stepLabel.textContent = 'Passo ' + step + ' de ' + totalSteps;
-      if (btnBack) btnBack.style.display = step > 1 ? '' : 'none';
-
-      if (step === totalSteps) {
-        btnNext.style.display = '';
-        btnNext.innerHTML = 'Enviar aplicação <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>';
-      } else {
-        btnNext.style.display = 'none';
-      }
-
-      wizardCurrentStep = step;
-    }
-
-    // Auto-advance on radio selection (steps 1-3)
-    document.querySelectorAll('input[name="segmento"]').forEach(function(r) {
-      r.addEventListener('change', function() {
-        setTimeout(function() { wizardGoTo(2); }, 350);
-      });
-    });
-    document.querySelectorAll('input[name="cargo"]').forEach(function(r) {
-      r.addEventListener('change', function() {
-        setTimeout(function() { wizardGoTo(3); }, 350);
-      });
-    });
+    // Navegação do wizard mora no v2.js. Aqui só a regra de negócio:
+    // a receita escolhida define se a etapa do Instagram entra no fluxo (50k+).
     document.querySelectorAll('input[name="receita"]').forEach(function(r) {
-      r.addEventListener('change', function() {
-        setTimeout(function() { wizardGoTo(4); }, 350);
-      });
-    });
-
-    document.getElementById('wizard-btn-next').addEventListener('click', function() {
-      if (wizardCurrentStep === 4) {
-        var nome = document.getElementById('f-nome');
-        var email = document.getElementById('f-email');
-        var whatsapp = document.getElementById('f-whatsapp');
-        if (!nome.reportValidity() || !email.reportValidity() || !whatsapp.reportValidity()) return;
-        document.getElementById('modal-form').dispatchEvent(new Event('submit', { cancelable: true }));
-      }
-    });
-
-    document.getElementById('wizard-btn-back').addEventListener('click', function() {
-      if (wizardCurrentStep > 1) wizardGoTo(wizardCurrentStep - 1);
+      r.addEventListener('change', function() { syncInstagramField(); });
     });
 
     // Attach modal to all CTA buttons
@@ -389,6 +559,23 @@ var wizardCurrentStep = 1;
         openModal();
       });
     });
+
+    // Link direto pro formulário: ?cadastro=1 / ?form=1 / #cadastro / #form abrem o wizard já iniciado
+    (function () {
+      function hashPedeForm() {
+        var h = window.location.hash;
+        return h === '#form' || h === '#cadastro';
+      }
+      var params = new URLSearchParams(window.location.search);
+      if (params.has('cadastro') || params.has('form') || hashPedeForm()) {
+        setTimeout(openModal, 400);
+      }
+      // CTA dentro do player VTurb (shadow DOM) navega pra #form sem passar pelos
+      // listeners de clique da página — o hashchange cobre esse caminho
+      window.addEventListener('hashchange', function () {
+        if (hashPedeForm()) openModal();
+      });
+    })();
 
     // Scroll reveal
     const observer = new IntersectionObserver(entries => {
@@ -460,9 +647,14 @@ var wizardCurrentStep = 1;
 
       function openExitPopup() {
         if (sessionStorage.getItem('exitPopupShown')) return;
+        // nunca por cima do formulario aberto
+        var modalEl = document.getElementById('modal');
+        if (modalEl && modalEl.classList.contains('open')) return;
         sessionStorage.setItem('exitPopupShown', '1');
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ event: 'exit_popup_view' });
       }
 
       function closeExitPopup() {
@@ -477,6 +669,24 @@ var wizardCurrentStep = 1;
           openExitPopup();
         }
       });
+
+      // Gatilho mobile: scroll rapido pra cima (>100px em <250ms) depois de ja ter
+      // descido a pagina — sinal de saida em touch, onde mouseleave nunca dispara.
+      // Sem gatilho de inatividade de proposito: quem assiste a VSL fica parado.
+      if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+        var anchorY = window.scrollY;
+        var anchorT = Date.now();
+        window.addEventListener('scroll', function () {
+          var now = Date.now();
+          var y = window.scrollY;
+          if (now - anchorT > 250) {
+            anchorY = y;
+            anchorT = now;
+            return;
+          }
+          if (anchorY - y > 100 && y > 400) openExitPopup();
+        }, { passive: true });
+      }
 
       // Fechar ao clicar no X
       document.getElementById('exit-popup-close').addEventListener('click', closeExitPopup);
@@ -493,6 +703,8 @@ var wizardCurrentStep = 1;
 
       // CTA: abrir o formulario principal
       document.getElementById('exit-popup-cta').addEventListener('click', function () {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ event: 'exit_popup_cta_click' });
         closeExitPopup();
         if (typeof openModal === 'function') openModal();
       });
@@ -524,5 +736,4 @@ var wizardCurrentStep = 1;
   });
 })();
 
-initLazyHeroVideo();
 scheduleThirdPartyBoot();

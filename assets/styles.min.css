@@ -145,7 +145,7 @@
     .hero-bg {
       position: absolute;
       inset: 0;
-      background-image: url('background fss.png');
+      background-image: url('background-fss.webp');
       background-size: cover;
       background-position: center;
       opacity: 1;
@@ -386,7 +386,7 @@
       background:
         radial-gradient(ellipse 60% 100% at 100% 50%, rgba(254,6,59,0.07) 0%, transparent 60%),
         linear-gradient(rgba(5,10,25,0.55), rgba(5,10,25,0.55)),
-        url('background fss.png') center/cover;
+        url('background-fss.webp') center/cover;
       padding: 48px 0;
       border-top: 1px solid rgba(255,255,255,0.07);
       border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -714,7 +714,7 @@
       background:
         radial-gradient(ellipse 60% 70% at 50% 100%, rgba(254,6,59,0.08) 0%, transparent 60%),
         linear-gradient(rgba(5,10,25,0.50), rgba(5,10,25,0.50)),
-        url('background fss.jpg') center/cover;
+        url('background-fss.webp') center/cover;
       padding: 56px 0 64px;
     }
     .about-diag-section .section-title { color: #fff; }
@@ -759,7 +759,7 @@
       background:
         radial-gradient(ellipse 60% 70% at 50% 0%, rgba(254,6,59,0.08) 0%, transparent 60%),
         linear-gradient(rgba(5,10,25,0.50), rgba(5,10,25,0.50)),
-        url('background fss.jpg') center/cover;
+        url('background-fss.webp') center/cover;
       padding: 64px 0;
     }
     .testimonials-section .section-title { color: #fff; }
@@ -954,7 +954,7 @@
     .finalcta-section {
       background:
         linear-gradient(rgba(5,10,25,0.50), rgba(5,10,25,0.50)),
-        url('background fss.jpg') center/cover;
+        url('background-fss.webp') center/cover;
       padding: 96px 0;
       text-align: center;
       position: relative;
@@ -1303,7 +1303,7 @@
       visibility: visible;
     }
     #exit-popup {
-      background: url('background fss.jpg') center center / cover no-repeat;
+      background: url('background-fss.webp') center center / cover no-repeat;
       border-radius: 20px;
       max-width: 520px;
       width: 100%;
@@ -1348,6 +1348,7 @@
     }
     #exit-popup-logo {
       width: 90px;
+      height: auto;
       margin-bottom: 20px;
       display: block;
     }

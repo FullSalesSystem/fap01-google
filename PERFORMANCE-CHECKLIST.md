@@ -1,7 +1,7 @@
 ## Performance Checklist (Landing FAP01)
 
 - [x] CSS minificado em `assets/styles.min.css`
-- [x] JS minificado em `assets/app.min.js`
+- [x] JS da página em `assets/produto.js` + `assets/v2.js` (deferred; app.js/app.min.js legados foram removidos)
 - [x] HTML aponta para arquivos minificados (`index.html`)
 - [x] Preload do asset principal (background hero)
 - [x] `loading="lazy"` aplicado nas imagens abaixo da dobra
