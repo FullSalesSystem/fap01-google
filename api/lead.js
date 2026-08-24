@@ -4,6 +4,10 @@ const ipBucket = new Map();
 const CLOSERS_PIPELINE_ID = 'mhe441mBoc0aQkVpwXXN';
 const PRE_SALES_PIPELINE_ID = 'jg6YojszvhB88pE7Uhmw';
 const PRE_SALES_STAGE_FUNIL_APLICACAO_ID = 'ccff0ad6-9ae8-4168-abed-8c83c948f61e';
+/* Pipeline "Desqualificados" — fora do board dos SDRs. Régua: só sócio/CEO
+   faturando 30k+ chega ao pré-vendas. */
+const DESQUALIFICADOS_PIPELINE_ID = 'lyyflLCiOZDwjaSfwxkj';
+const DESQUALIFICADOS_STAGE_APLICACAO_ID = 'd9a875c4-302f-4176-8be9-89b4616970fc';
 const LEAD_SOURCE = 'FAP01 - Sessão Estratégica';
 const SUPABASE_TABLE = '[Leads] FAP01';
 
@@ -179,9 +183,11 @@ function buildGhlPayload(payload, locationId) {
     email: payload.email,
     phone: payload.whatsapp,
     source: LEAD_SOURCE,
+    /* 'fap1-cadastro-trigger' dispara mensagem inicial + atribuição de SDR:
+       desqualificado (não é sócio ou fatura abaixo de 30k) não recebe. */
     tags: [
       'fap1-cadastro',
-      'fap1-cadastro-trigger',
+      ...(classificacao === 'desqualificado' ? [] : ['fap1-cadastro-trigger']),
       classificacao,
       `cargo:${payload.cargo}`,
       `segmento:${payload.segmento}`,
@@ -367,7 +373,7 @@ async function updateContactSource(ghlBaseUrl, pitToken, contactId) {
   return response.ok;
 }
 
-async function createOpportunityInPreSales(ghlBaseUrl, pitToken, locationId, contactId, name) {
+async function createOpportunity(ghlBaseUrl, pitToken, locationId, contactId, name, pipelineId, stageId) {
   const endpoint = `${ghlBaseUrl.replace(/\/+$/, '')}/opportunities/`;
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -380,8 +386,8 @@ async function createOpportunityInPreSales(ghlBaseUrl, pitToken, locationId, con
     body: JSON.stringify({
       locationId,
       contactId,
-      pipelineId: PRE_SALES_PIPELINE_ID,
-      pipelineStageId: PRE_SALES_STAGE_FUNIL_APLICACAO_ID,
+      pipelineId,
+      pipelineStageId: stageId,
       status: 'open',
       name,
       source: LEAD_SOURCE,
@@ -390,7 +396,7 @@ async function createOpportunityInPreSales(ghlBaseUrl, pitToken, locationId, con
   return response.ok;
 }
 
-async function moveOpportunityToPreSalesStage(ghlBaseUrl, pitToken, opportunityId) {
+async function moveOpportunity(ghlBaseUrl, pitToken, opportunityId, pipelineId, stageId) {
   const endpoint = `${ghlBaseUrl.replace(/\/+$/, '')}/opportunities/${opportunityId}`;
   const response = await fetch(endpoint, {
     method: 'PUT',
@@ -401,8 +407,8 @@ async function moveOpportunityToPreSalesStage(ghlBaseUrl, pitToken, opportunityI
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      pipelineId: PRE_SALES_PIPELINE_ID,
-      pipelineStageId: PRE_SALES_STAGE_FUNIL_APLICACAO_ID,
+      pipelineId,
+      pipelineStageId: stageId,
       source: LEAD_SOURCE,
     }),
   });
@@ -486,6 +492,28 @@ async function handler(req, res) {
 
       if (hasCloserOpportunity) {
         await addContactTags(ghlBaseUrl, pitToken, contactId, ['reentrada-fap01']);
+      } else if (classificacao === 'desqualificado') {
+        /* Card fora do board de pré-vendas. A tag de trigger nem entra no
+           upsert (buildGhlPayload), então não há evento "tag added" pra
+           disparar mensagem inicial nem atribuição de SDR. Contato, tags,
+           nota e Supabase seguem iguais — o lead fica na base. */
+        const jaDesqualificado = opportunities.some((op) => op.pipelineId === DESQUALIFICADOS_PIPELINE_ID);
+        const existingPreSalesOpp = opportunities.find((op) => op.pipelineId === PRE_SALES_PIPELINE_ID);
+
+        if (!jaDesqualificado) {
+          if (existingPreSalesOpp) {
+            await moveOpportunity(
+              ghlBaseUrl, pitToken, existingPreSalesOpp.id,
+              DESQUALIFICADOS_PIPELINE_ID, DESQUALIFICADOS_STAGE_APLICACAO_ID,
+            );
+          } else {
+            await createOpportunity(
+              ghlBaseUrl, pitToken, locationId, contactId, payload.nome,
+              DESQUALIFICADOS_PIPELINE_ID, DESQUALIFICADOS_STAGE_APLICACAO_ID,
+            );
+          }
+        }
+        console.log('[ghl] desqualificado fora do pipeline de SDR', { contactId });
       } else {
         const existingPreSalesOpp = opportunities.find((op) => op.pipelineId === PRE_SALES_PIPELINE_ID);
 
@@ -494,10 +522,16 @@ async function handler(req, res) {
             existingPreSalesOpp.pipelineStageId !== PRE_SALES_STAGE_FUNIL_APLICACAO_ID ||
             existingPreSalesOpp.source !== LEAD_SOURCE
           ) {
-            await moveOpportunityToPreSalesStage(ghlBaseUrl, pitToken, existingPreSalesOpp.id);
+            await moveOpportunity(
+              ghlBaseUrl, pitToken, existingPreSalesOpp.id,
+              PRE_SALES_PIPELINE_ID, PRE_SALES_STAGE_FUNIL_APLICACAO_ID,
+            );
           }
         } else {
-          await createOpportunityInPreSales(ghlBaseUrl, pitToken, locationId, contactId, payload.nome);
+          await createOpportunity(
+            ghlBaseUrl, pitToken, locationId, contactId, payload.nome,
+            PRE_SALES_PIPELINE_ID, PRE_SALES_STAGE_FUNIL_APLICACAO_ID,
+          );
         }
       }
     }
