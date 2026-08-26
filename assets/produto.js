@@ -388,6 +388,10 @@ var formOpenedAt = Date.now();
       CLICK_ID_KEYS.forEach(function(k) {
         if (clickIds[k]) redirectParams.set(k, clickIds[k]);
       });
+      /* sid = submission_id que foi pro /api/lead (fase 1 quando houve). A
+         pagina de destino usa como eventID do pixel, e o servidor manda o
+         mesmo id pela Conversions API — a Meta deduplica os dois. */
+      redirectParams.set('sid', (leadCapturado && leadCapturado.submission_id) || submissionId);
 
       var payload = {
         submission_id: submissionId,
