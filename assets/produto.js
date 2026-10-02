@@ -344,7 +344,7 @@ var formOpenedAt = Date.now();
 
       var isEligibleCargo = (cargo === 'socio-empresario');
       var isHighRevenue = (receita === '50k-100k' || receita === '100k-300k' || receita === '300k-500k' || receita === '500k-1m' || receita === 'acima-1m');
-      var isSemiRevenue = (receita === '30k-50k');
+      var isSemiRevenue = (receita === '40k-50k' || receita === '30k-50k');
 
       var submissionId = createSubmissionId();
 

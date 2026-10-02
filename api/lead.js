@@ -6,7 +6,7 @@ const CLOSERS_PIPELINE_ID = 'mhe441mBoc0aQkVpwXXN';
 const PRE_SALES_PIPELINE_ID = 'jg6YojszvhB88pE7Uhmw';
 const PRE_SALES_STAGE_FUNIL_APLICACAO_ID = 'ccff0ad6-9ae8-4168-abed-8c83c948f61e';
 /* Pipeline "Desqualificados" (fora do board dos SDRs). Lead que não é sócio
-   ou fatura abaixo de 30k para aqui e não recebe tag de trigger. */
+   ou fatura abaixo de 40k para aqui e não recebe tag de trigger. */
 const DESQUALIFICADOS_PIPELINE_ID = 'lyyflLCiOZDwjaSfwxkj';
 const DESQUALIFICADOS_STAGE_APLICACAO_ID = 'd9a875c4-302f-4176-8be9-89b4616970fc';
 const LEAD_SOURCE = 'FAP01 - Sessão Estratégica';
@@ -49,8 +49,10 @@ const ALLOWED_SEGMENTOS = new Set([
 ]);
 
 const ALLOWED_RECEITAS = new Set([
-  'abaixo-30k',
-  '30k-50k',
+  'abaixo-40k',
+  '40k-50k',
+  'abaixo-30k', // legado
+  '30k-50k',    // legado
   '50k-100k',
   '100k-300k',
   '300k-500k',
@@ -92,6 +94,9 @@ const CARGO_LABELS = {
 };
 
 const RECEITA_LABELS = {
+  'abaixo-40k': 'Abaixo de R$ 40 mil',
+  '40k-50k': 'Entre R$ 40 mil e R$ 50 mil',
+  /* legado (página em cache, régua de 30k até 02/10/2026) */
   'abaixo-30k': 'Abaixo de R$ 30 mil',
   '30k-50k': 'Entre R$ 30 mil e R$ 50 mil',
   '50k-100k': 'Entre R$ 50 mil e R$ 100 mil',
@@ -210,9 +215,9 @@ function classifyLead(cargo, faturamento) {
   ]).has(faturamento);
 
   if (isSocioEmpresario && isQualificadoFaturamento) return 'qualificado';
-  if (isSocioEmpresario && faturamento === '30k-50k') return 'SemiQualificado';
-  if (!isSocioEmpresario || faturamento === 'abaixo-30k') return 'desqualificado';
-
+  /* Piso do SDR = 40k (02/10/2026). '30k-50k' é legado de página em cache:
+     não dá pra separar 30-40 de 40-50, então segue Semi pra não perder lead. */
+  if (isSocioEmpresario && (faturamento === '40k-50k' || faturamento === '30k-50k')) return 'SemiQualificado';
   return 'desqualificado';
 }
 
@@ -767,7 +772,7 @@ async function handler(req, res) {
       if (hasCloserOpportunity) {
         await addContactTags(ghlBaseUrl, pitToken, contactId, ['reentrada-fap01']);
       } else if (classificacao === 'desqualificado') {
-        /* Régua: só sócio/CEO faturando 30k+ chega ao SDR. Desqualificado vai
+        /* Régua: só sócio/CEO faturando 40k+ chega ao SDR. Desqualificado vai
            pro pipeline "Desqualificados" (fora do board de pré-vendas) e NÃO
            recebe 'fap1-cadastro-trigger' — é essa tag que dispara a mensagem
            inicial e a atribuição de SDR. Contato, tags, nota e Supabase seguem

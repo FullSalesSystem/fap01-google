@@ -28,6 +28,9 @@ const CARGO_LABELS = {
 };
 
 const RECEITA_LABELS = {
+  'abaixo-40k': 'Abaixo de R$ 40 mil',
+  '40k-50k': 'Entre R$ 40 mil e R$ 50 mil',
+  /* legado (página em cache, régua de 30k até 02/10/2026) */
   'abaixo-30k': 'Abaixo de R$ 30 mil',
   '30k-50k': 'Entre R$ 30 mil e R$ 50 mil',
   '50k-100k': 'Entre R$ 50 mil e R$ 100 mil',
