@@ -1,3 +1,4 @@
+const fssPhone = require('./_fss-phone.js');
 /* Endpoint dedicado para leads que SAEM do formulário antes de concluir.
    Insere uma linha em `fap_form` no Supabase. Não toca no fluxo principal
    (/api/lead → [Leads] FAP01 + GHL), que continua igual.
@@ -108,7 +109,9 @@ async function handler(req, res) {
   const receitaSlug  = sanitizeText(raw.receita, 40);
   const nome     = sanitizeText(raw.nome, 120);
   const email    = sanitizeText(raw.email, 254).toLowerCase();
-  const whatsapp = sanitizeText(raw.whatsapp, 32);
+  /* parcial nunca é barrado pelo telefone; só não grava número lixo */
+  const tel = fssPhone(sanitizeText(raw.whatsapp, 32));
+  const whatsapp = tel.ok ? tel.full : '';
   const instagram = sanitizeText(raw.instagram, 60);
 
   if (!segmentoSlug && !cargoSlug && !receitaSlug && !nome && !email && !whatsapp) {

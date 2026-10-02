@@ -77,48 +77,51 @@ var formOpenedAt = Date.now();
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     }
 
-    function digitsOnly(value) {
-      return String(value || '').replace(/\D/g, '');
-    }
+    /* fss-phone — regra ÚNICA de telefone/WhatsApp dos funis FSS (v1, 2026-10-02).
+       Fonte canônica: ~/fss-phone/fss-phone.js (gêmeo PHP: fss-phone.php).
+       Cada funil leva uma CÓPIA desta função (front e API) — mudou aqui, muda lá.
 
-    /* ── Telefone internacional (modo "+") ────────────────────────
-       Se o PRIMEIRO caractere digitado no WhatsApp for "+", o campo
-       vira modo internacional livre: aceita +, dígitos e espaços,
-       sem máscara BR e ignorando o select de país. Normaliza pra
-       "+CC NUMERO". CC (código do país, ITU): 1 e 7 têm 1 dígito;
-       conjunto fechado de 2 dígitos; o resto tem 3. */
-    var CC_1DIGIT = { '1': 1, '7': 1 };
-    var CC_2DIGIT = {
-      '20': 1, '27': 1, '30': 1, '31': 1, '32': 1, '33': 1, '34': 1, '36': 1, '39': 1,
-      '40': 1, '41': 1, '43': 1, '44': 1, '45': 1, '46': 1, '47': 1, '48': 1, '49': 1,
-      '51': 1, '52': 1, '53': 1, '54': 1, '55': 1, '56': 1, '57': 1, '58': 1,
-      '60': 1, '61': 1, '62': 1, '63': 1, '64': 1, '65': 1, '66': 1,
-      '81': 1, '82': 1, '84': 1, '86': 1,
-      '90': 1, '91': 1, '92': 1, '93': 1, '94': 1, '95': 1, '98': 1
-    };
+       fssPhone(raw, cc) → { ok:true, cc, num, full:'+CC NUM', e164 } | { ok:false, error }
+       - raw sem "+": Brasil (ou o `cc` do select de país, se vier ≠ 55).
+       - raw com "+": internacional; "+55" volta pra regra BR.
+       BR: tira 0 e 55 da frente, exige DDD real + celular de 11 dígitos começando com 9,
+       recusa número de mentira (88888888, 12345678...). */
+    var FSS_DDD = '11 12 13 14 15 16 17 18 19 21 22 24 27 28 31 32 33 34 35 37 38 41 42 43 44 45 46 47 48 49 51 53 54 55 61 62 63 64 65 66 67 68 69 71 73 74 75 77 79 81 82 83 84 85 86 87 88 89 91 92 93 94 95 96 97 98 99';
+    var FSS_CC2 = ' 20 27 30 31 32 33 34 36 39 40 41 43 44 45 46 47 48 49 51 52 53 54 55 56 57 58 60 61 62 63 64 65 66 81 82 84 86 90 91 92 93 94 95 98 ';
+    /* tamanho do número nacional nos países que mais aparecem; resto: 7-12 */
+    var FSS_LEN = { '1': [10], '351': [9], '34': [9], '33': [9], '39': [9, 10], '44': [10], '49': [10, 11], '41': [9], '353': [9], '54': [10, 11], '52': [10], '56': [9], '57': [10], '51': [9], '595': [9], '598': [8], '591': [8], '244': [9], '258': [9], '61': [9], '81': [9, 10] };
 
-    function isIntlPhoneMode(raw) {
-      return String(raw || '').trim().charAt(0) === '+';
-    }
-
-    /* "+351 912345678" | "+351912345678" → { cc:'351', num:'912345678',
-       full:'+351 912345678' }. Null quando não está no modo "+" ou o
-       número (sem CC) foge de 8-15 dígitos. */
-    function normalizeIntlPhone(raw) {
-      var v = String(raw || '').trim();
-      if (v.charAt(0) !== '+') return null;
-      if (!/^\+[\d\s]+$/.test(v)) return null;
-      var digits = v.slice(1).replace(/\D/g, '');
-      var cc;
-      if (CC_1DIGIT[digits.slice(0, 1)]) cc = digits.slice(0, 1);
-      else if (CC_2DIGIT[digits.slice(0, 2)]) cc = digits.slice(0, 2);
-      else cc = digits.slice(0, 3);
-      var num = digits.slice(cc.length);
-      if (!cc || num.length < 8 || num.length > 15) return null;
-      return { cc: cc, num: num, full: '+' + cc + ' ' + num };
+    function fssPhone(raw, cc) {
+      var s = String(raw == null ? '' : raw).trim();
+      var d = s.replace(/\D/g, '');
+      var BAD = 'Confira o número: DDD + celular com 9. Ex.: (11) 9XXXX-XXXX';
+      if (!d) return { ok: false, error: 'Informe seu WhatsApp com DDD.' };
+      if (s.charAt(0) === '+' || (cc && String(cc) !== '55')) {
+        if (s.charAt(0) !== '+') d = String(cc).replace(/\D/g, '') + d.replace(/^0+/, '');
+        if (d.slice(0, 2) === '55') { s = d.slice(2); d = s; }
+        else {
+          var c = d.charAt(0) === '1' || d.charAt(0) === '7' ? d.slice(0, 1)
+            : FSS_CC2.indexOf(' ' + d.slice(0, 2) + ' ') >= 0 ? d.slice(0, 2) : d.slice(0, 3);
+          var n = d.slice(c.length).replace(/^0/, '');
+          var lens = FSS_LEN[c];
+          var okLen = lens ? lens.indexOf(n.length) >= 0 : n.length >= 7 && n.length <= 12;
+          if (!okLen || /^(\d)\1+$/.test(n) || (c === '1' && !/^[2-9]\d\d[2-9]/.test(n))) return { ok: false, error: 'Número internacional inválido. Use +código do país e o número completo.' };
+          return { ok: true, cc: c, num: n, full: '+' + c + ' ' + n, e164: '+' + c + n };
+        }
+      }
+      d = d.replace(/^0+/, '');
+      if ((d.length === 12 || d.length === 13) && d.slice(0, 2) === '55') d = d.slice(2).replace(/^0+/, '');
+      if (d.length === 10 && FSS_DDD.indexOf(d.slice(0, 2)) >= 0 && /^[6-9]/.test(d.charAt(2))) d = d.slice(0, 2) + '9' + d.slice(2);
+      if (d.length !== 11) return { ok: false, error: BAD };
+      if (FSS_DDD.indexOf(d.slice(0, 2)) < 0 || d.charAt(0) === '0') return { ok: false, error: 'DDD inválido. Confira o código da sua cidade.' };
+      if (d.charAt(2) !== '9') return { ok: false, error: 'Use um celular com WhatsApp: depois do DDD ele começa com 9.' };
+      var t = d.slice(3);
+      if (/^(\d)\1+$/.test(t) || /^(\d)\1{5}/.test(t) || '0123456789012345678'.indexOf(t) >= 0 || '9876543210987654321'.indexOf(t) >= 0)
+        return { ok: false, error: 'Esse número não parece real. Digite o seu WhatsApp.' };
+      return { ok: true, cc: '55', num: d, full: '+55 ' + d, e164: '+55' + d };
     }
     /* v2.js reusa a mesma regra (validação do passo 6 e beacon de parcial) */
-    window.__fssIntlPhone = normalizeIntlPhone;
+    window.__fssPhone = fssPhone;
 
     // Instagram só é perguntado pra quem fatura acima de R$ 50 mil/mês
     var INSTAGRAM_RECEITAS = ['50k-100k', '100k-300k', '300k-500k', '500k-1m', 'acima-1m'];
@@ -230,18 +233,12 @@ var formOpenedAt = Date.now();
     var leadCapturado = null; // { submission_id, submitted_at, email, whatsapp }
 
     function coletarContato() {
-      var phoneRaw = document.getElementById('f-whatsapp').value;
-      var intl = normalizeIntlPhone(phoneRaw); // null fora do modo "+" ou inválido
-      var pais = document.getElementById('f-country-code').value;
-      /* modo "+" inválido → digits vazio: reprova nos checks de 8-15 */
-      var digits = isIntlPhoneMode(phoneRaw)
-        ? (intl ? intl.num : '')
-        : digitsOnly(phoneRaw);
+      var tel = fssPhone(document.getElementById('f-whatsapp').value, document.getElementById('f-country-code').value);
       return {
         nome: sanitizeText(document.getElementById('f-nome').value, 120),
         email: sanitizeText(document.getElementById('f-email').value, 254).toLowerCase(),
-        whatsappDigits: digits,
-        whatsapp: intl ? intl.full : '+' + pais + ' ' + digits,
+        telOk: tel.ok,
+        whatsapp: tel.ok ? tel.full : '',
       };
     }
 
@@ -252,7 +249,7 @@ var formOpenedAt = Date.now();
       if (document.getElementById('f-website').value) return false;      // honeypot
       if (Date.now() - formOpenedAt < 1800) return false;                // rápido demais (bot)
       if (!isValidEmail(c.email)) return false;
-      if (c.whatsappDigits.length < 8 || c.whatsappDigits.length > 15) return false;
+      if (!c.telOk) return false;
 
       /* voltou, trocou contato e seguiu de novo → captura de novo com os dados atuais */
       if (leadCapturado && leadCapturado.email === c.email && leadCapturado.whatsapp === c.whatsapp) {
@@ -314,13 +311,8 @@ var formOpenedAt = Date.now();
       e.preventDefault();
       var nome     = sanitizeText(document.getElementById('f-nome').value, 120);
       var email    = sanitizeText(document.getElementById('f-email').value, 254).toLowerCase();
-      var pais     = document.getElementById('f-country-code').value;
-      var phoneRaw = document.getElementById('f-whatsapp').value;
-      var intl     = normalizeIntlPhone(phoneRaw); // null fora do modo "+" ou inválido
-      var whatsappDigits = isIntlPhoneMode(phoneRaw)
-        ? (intl ? intl.num : '')
-        : digitsOnly(phoneRaw);
-      var whatsapp = intl ? intl.full : '+' + pais + ' ' + whatsappDigits;
+      var tel      = fssPhone(document.getElementById('f-whatsapp').value, document.getElementById('f-country-code').value);
+      var whatsapp = tel.ok ? tel.full : '';
       var cargoEl = document.querySelector('input[name="cargo"]:checked');
       var cargo = cargoEl ? cargoEl.value : '';
       var segmentoEl = document.querySelector('input[name="segmento"]:checked');
@@ -343,8 +335,8 @@ var formOpenedAt = Date.now();
       if (!isValidEmail(email)) {
         return alert('Informe um e-mail valido.');
       }
-      if (whatsappDigits.length < 8 || whatsappDigits.length > 15) {
-        return alert('Informe um WhatsApp valido.');
+      if (!tel.ok) {
+        return alert(tel.error);
       }
       if (instagramFieldVisible() && !instagram) {
         return alert('Informe o @ do seu Instagram.');
@@ -545,7 +537,13 @@ var formOpenedAt = Date.now();
           return;
         }
         var m = getMask(countrySelect.value);
-        var d = raw.replace(/\D/g, '').substring(0, m.max);
+        var d = raw.replace(/\D/g, '');
+        /* BR: "0" de operadora e "55" digitado na frente saem antes de cortar no limite */
+        if (countrySelect.value === '55') {
+          d = d.replace(/^0+/, '');
+          if (d.length > 11 && d.slice(0, 2) === '55') d = d.slice(2).replace(/^0+/, '');
+        }
+        d = d.substring(0, m.max);
         e.target.value = d.length === 0 ? '' : m.fmt(d);
       });
     })();

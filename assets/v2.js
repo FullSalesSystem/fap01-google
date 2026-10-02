@@ -34,16 +34,9 @@
   function readPartial() {
     var country = (document.getElementById('f-country-code') || {}).value || '';
     var phone   = ((document.getElementById('f-whatsapp')    || {}).value || '').trim();
-    var whatsapp = '';
-    if (phone) {
-      if (phone.charAt(0) === '+') {
-        /* modo internacional (normalização mora no produto.js) */
-        var intl = typeof window.__fssIntlPhone === 'function' ? window.__fssIntlPhone(phone) : null;
-        whatsapp = intl ? intl.full : phone.replace(/\s+/g, ' ');
-      } else {
-        whatsapp = (country ? '+' + country + ' ' : '') + phone;
-      }
-    }
+    /* regra única de telefone mora no produto.js; número inválido não é gravado */
+    var tel = phone && typeof window.__fssPhone === 'function' ? window.__fssPhone(phone, country) : null;
+    var whatsapp = tel && tel.ok ? tel.full : '';
     var seg = document.querySelector('input[name="segmento"]:checked');
     var car = document.querySelector('input[name="cargo"]:checked');
     var rec = document.querySelector('input[name="receita"]:checked');
@@ -231,6 +224,10 @@
     });
   });
 
+  /* erro do telefone some assim que a pessoa volta a digitar */
+  var whInput = document.getElementById('f-whatsapp');
+  if (whInput) whInput.addEventListener('input', function () { whInput.setCustomValidity(''); });
+
   /* ─── goToStep ───────────────────────────────────────────── */
   function goToStep(step) {
     var seq = stepSeq();
@@ -340,13 +337,10 @@
     if (step === 6) {
       var wh = document.getElementById('f-whatsapp');
       if (!wh) return invalid(wh);
-      var whRaw = wh.value.trim();
-      if (whRaw.charAt(0) === '+' && typeof window.__fssIntlPhone === 'function') {
-        /* modo internacional: +código do país + número de 8-15 dígitos */
-        if (!window.__fssIntlPhone(whRaw)) return invalid(wh);
-      } else if (wh.value.replace(/\D/g, '').length < 8) {
-        return invalid(wh);
-      }
+      var tel = window.__fssPhone(wh.value, (document.getElementById('f-country-code') || {}).value);
+      /* mostra o motivo (DDD, falta o 9, número de mentira...) no balão nativo */
+      wh.setCustomValidity(tel.ok ? '' : tel.error);
+      if (!tel.ok) return invalid(wh);
     }
     if (step === 7) {
       /* Instagram é obrigatório quando a etapa está no fluxo (receita 50k+) */
