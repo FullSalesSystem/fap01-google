@@ -23,12 +23,15 @@
     return igNeeded() ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6];
   }
 
-  /* Tracking → tabela fap_form via /api/lead-partial.
-     Dispara SÓ no abandono (fechou modal / fechou aba / trocou de aba)
-     e apenas 1 vez por sessão de modal. Se o lead completou o form,
-     não grava em fap_form — vai pro fluxo normal /api/lead → [Leads] FAP01.
-     Assim evita linha duplicada para o mesmo lead. */
+  /* Tracking → /api/lead-partial (fap_form + GHL com tag form-incompleto
+     quando já tem e-mail ou WhatsApp válido). Dispara SÓ no abandono
+     (fechou modal / fechou aba / trocou de aba). fap_form recebe 1 linha por
+     sessão de modal; reenvio só acontece se os dados mudaram (ex.: saiu pra
+     copiar o número, voltou e digitou) e vai com registrar:false — só
+     atualiza o GHL. Se o lead completou o form, não dispara: vai pro fluxo
+     normal /api/lead → [Leads] FAP01. */
   var partialSent = false;
+  var partialKey = '';
   var formCompleted = false;
 
   function readPartial() {
@@ -54,10 +57,14 @@
   }
 
   function sendPartialBeacon() {
-    if (formCompleted || partialSent) return;
+    if (formCompleted) return;
     var data = readPartial();
     if (!data.segmento && !data.cargo && !data.receita &&
         !data.nome && !data.email && !data.whatsapp) return;
+    var key = JSON.stringify(data);
+    if (key === partialKey) return;
+    partialKey = key;
+    data.registrar = !partialSent;
     partialSent = true;
     try {
       var body = JSON.stringify(data);
@@ -101,6 +108,7 @@
   function openModal() {
     if (!modalBackdrop) return;
     partialSent = false;
+    partialKey = '';
     formCompleted = false;
     modalBackdrop.classList.add('open');
     document.body.style.overflow = 'hidden';

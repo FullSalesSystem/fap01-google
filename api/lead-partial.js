@@ -1,7 +1,10 @@
 const fssPhone = require('./_fss-phone.js');
 /* Endpoint dedicado para leads que SAEM do formulário antes de concluir.
-   Insere uma linha em `fap_form` no Supabase. Não toca no fluxo principal
-   (/api/lead → [Leads] FAP01 + GHL), que continua igual.
+   Insere uma linha em `fap_form` no Supabase (1x por sessão de modal: o front
+   manda `registrar: false` nos reenvios) e, se já tem e-mail OU telefone
+   válido, cria/atualiza o contato no GHL com a tag 'form-incompleto' — sem
+   card, sem tag de trigger, sem SDR. Quem completa depois entra pelo
+   /api/lead normal, que tira a tag (E2E 02/10/2026: SDR atribuído igual).
 
    Recebe via fetch ou navigator.sendBeacon (Blob application/json). */
 
@@ -9,6 +12,8 @@ const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 20;
 const ipBucket = new Map();
 const SUPABASE_TABLE = 'fap_form';
+const LEAD_SOURCE = 'FAP01 - Sessão Estratégica';
+const TAGS_INCOMPLETO = ['form-incompleto', 'fap01-form-incompleto'];
 
 const SEGMENTO_LABELS = {
   saude: 'Saúde',
@@ -92,6 +97,46 @@ async function sendToSupabase(supabaseUrl, supabaseKey, row) {
   return response.ok;
 }
 
+async function ghl(method, path, body) {
+  const base = (process.env.GHL_BASE_URL || 'https://services.leadconnectorhq.com').replace(/\/+$/, '');
+  const response = await fetch(base + path, {
+    method,
+    headers: {
+      Authorization: `Bearer ${process.env.GHL_PIT_TOKEN}`,
+      Accept: 'application/json',
+      Version: '2021-07-28',
+      'Content-Type': 'application/json',
+      locationId: process.env.GHL_LOCATION_ID,
+    },
+    body: JSON.stringify(body),
+  });
+  return { ok: response.ok, status: response.status, data: await response.json().catch(() => ({})) };
+}
+
+/* Upsert SEM `tags` (tags no upsert substituem o conjunto inteiro do contato)
+   e sem campo vazio (não apaga nome/telefone que o contato já tinha). */
+async function sendPartialToGhl({ nome, email, whatsapp }) {
+  if (!process.env.GHL_PIT_TOKEN || !process.env.GHL_LOCATION_ID) return;
+  const body = { locationId: process.env.GHL_LOCATION_ID };
+  if (nome) {
+    const parts = nome.split(' ');
+    body.firstName = parts[0];
+    if (parts.length > 1) body.lastName = parts.slice(1).join(' ');
+  }
+  if (email) body.email = email;
+  if (whatsapp) body.phone = whatsapp.replace(/\s+/g, '');
+  const up = await ghl('POST', '/contacts/upsert', body);
+  const contactId = up.data?.contact?.id;
+  if (!up.ok || !contactId) {
+    console.error('[ghl] partial upsert failed', { status: up.status });
+    return;
+  }
+  /* source só no contato novo: não reescreve a origem de quem já existia */
+  if (up.data.new) await ghl('PUT', `/contacts/${contactId}`, { source: LEAD_SOURCE });
+  await ghl('POST', `/contacts/${contactId}/tags`, { tags: TAGS_INCOMPLETO });
+  console.log('[ghl] partial ok', { contactId, novo: Boolean(up.data.new) });
+}
+
 async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'method_not_allowed' });
 
@@ -111,19 +156,20 @@ async function handler(req, res) {
   const cargoSlug    = sanitizeText(raw.cargo, 40);
   const receitaSlug  = sanitizeText(raw.receita, 40);
   const nome     = sanitizeText(raw.nome, 120);
-  const email    = sanitizeText(raw.email, 254).toLowerCase();
+  const emailRaw = sanitizeText(raw.email, 254).toLowerCase();
+  const email    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : '';
   /* parcial nunca é barrado pelo telefone; só não grava número lixo */
   const tel = fssPhone(sanitizeText(raw.whatsapp, 32));
   const whatsapp = tel.ok ? tel.full : '';
   const instagram = sanitizeText(raw.instagram, 60);
 
-  if (!segmentoSlug && !cargoSlug && !receitaSlug && !nome && !email && !whatsapp) {
+  if (!segmentoSlug && !cargoSlug && !receitaSlug && !nome && !emailRaw && !whatsapp) {
     return json(res, 400, { error: 'empty_payload' });
   }
 
   const row = {
     nome_completo: nome || null,
-    email: email || null,
+    email: emailRaw || null,
     whatsapp: whatsapp || null,
     qual_o_segmento_da_sua_empresa: SEGMENTO_LABELS[segmentoSlug] || segmentoSlug || null,
     qual_e_o_seu_papel_hoje_na_empresa: CARGO_LABELS[cargoSlug] || cargoSlug || null,
@@ -141,10 +187,20 @@ async function handler(req, res) {
     return json(res, 500, { error: 'server_not_configured' });
   }
 
-  try {
-    await sendToSupabase(supabaseUrl, supabaseKey, row);
-  } catch (err) {
-    console.error('[fap_form] threw', { message: err && err.message });
+  if (raw.registrar !== false) {
+    try {
+      await sendToSupabase(supabaseUrl, supabaseKey, row);
+    } catch (err) {
+      console.error('[fap_form] threw', { message: err && err.message });
+    }
+  }
+
+  if (email || whatsapp) {
+    try {
+      await sendPartialToGhl({ nome, email, whatsapp });
+    } catch (err) {
+      console.error('[ghl] partial threw', { message: err && err.message });
+    }
   }
 
   return json(res, 202, { ok: true });

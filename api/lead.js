@@ -759,6 +759,8 @@ async function handler(req, res) {
       for (const v of ALLOWED_CARGOS) if (v !== payload.cargo) staleValueTags.push(`cargo:${v}`);
       for (const v of ALLOWED_SEGMENTOS) if (v !== payload.segmento) staleValueTags.push(`segmento:${v}`);
       for (const v of ALLOWED_RECEITAS) if (v !== payload.receita) staleValueTags.push(`receita:${v}`);
+      /* completou: sai da lista de quem abandonou o form (lead-partial.js) */
+      staleValueTags.push('form-incompleto', 'fap01-form-incompleto');
       await removeContactTags(ghlBaseUrl, pitToken, contactId, staleValueTags);
       try {
         const noteUserId = ghlUserId || data?.contact?.assignedTo || '';
