@@ -1,26 +1,29 @@
 (function () {
   'use strict';
 
-  /* Passos físicos: 1 segmento · 2 perfil · 3 receita · 4 nome · 5 email ·
-     6 whatsapp · 7 instagram. O passo 7 só entra no fluxo pra receita 50k+ —
-     quem decide é o produto.js (syncInstagramField), que esconde/mostra o
-     #field-instagram. As tabs do header são SEÇÕES: a de Contato agrupa os
-     passos 4-6; a numeração de passos e tabs é reescrita a cada transição. */
+  /* Passos físicos: 1 segmento · 2 perfil · 3 receita · 4 contato (nome,
+     e-mail e WhatsApp numa tela só desde 05/10/2026 — antes eram 3 telas e
+     o sócio 40k+ abandonava nelas) · 7 instagram. O passo 7 só entra no
+     fluxo pra receita 50k+ — quem decide é o produto.js (syncInstagramField),
+     que esconde/mostra o #field-instagram. Uma bolinha por passo. */
   var currentStep = 1;
 
   /* passo físico → tab (data-step da tab) */
-  var TAB_OF = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 4, 7: 5 };
+  var TAB_OF = { 1: 1, 2: 2, 3: 3, 4: 4, 7: 5 };
   /* passos de radio avançam sozinhos; passos de texto têm botão + autofocus */
   var RADIO_STEPS = { 1: 'segmento', 2: 'cargo', 3: 'receita' };
-  var FOCUS_OF = { 4: 'f-nome', 5: 'f-email', 6: 'f-whatsapp', 7: 'f-instagram' };
+  var FOCUS_OF = { 4: 'f-nome', 7: 'f-instagram' };
 
   function igNeeded() {
     var box = document.getElementById('field-instagram');
     return Boolean(box && !box.hidden);
   }
 
+  /* Antes da receita o Instagram ainda pode entrar: conta 5 passos desde a
+     abertura (o total só cai pra 4, nunca sobe, quando a receita fica <50k). */
   function stepSeq() {
-    return igNeeded() ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6];
+    var receitaRespondida = document.querySelector('input[name="receita"]:checked');
+    return (igNeeded() || !receitaRespondida) ? [1, 2, 3, 4, 7] : [1, 2, 3, 4];
   }
 
   /* Tracking → /api/lead-partial (fap_form + GHL com tag form-incompleto
@@ -185,7 +188,7 @@
         /* Saindo do WhatsApp pra etapa do Instagram: o lead já vai inteiro
            pro backend (fase 1) — abandono no Instagram não perde o lead.
            Com o lead capturado, o beacon de parcial não precisa disparar. */
-        if (currentStep === 6 && seq[idx + 1] === 7 &&
+        if (currentStep === 4 && seq[idx + 1] === 7 &&
             typeof window.__fap01PreInstagram === 'function' &&
             window.__fap01PreInstagram()) {
           formCompleted = true;
@@ -220,14 +223,17 @@
     });
   }
 
-  /* Enter nos campos de texto avança em vez de submeter o form */
+  /* Enter: nome → e-mail → WhatsApp → avança (não submete o form cru) */
+  var ENTER_NEXT = { 'f-nome': 'f-email', 'f-email': 'f-whatsapp' };
   ['f-nome', 'f-email', 'f-whatsapp', 'f-instagram'].forEach(function (id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (btnNext) btnNext.click();
+        var prox = ENTER_NEXT[id] && document.getElementById(ENTER_NEXT[id]);
+        if (prox) prox.focus();
+        else if (btnNext) btnNext.click();
       }
     });
   });
@@ -337,12 +343,8 @@
     if (step === 4) {
       var n = document.getElementById('f-nome');
       if (!n || n.value.trim().length < 2) return invalid(n);
-    }
-    if (step === 5) {
       var em = document.getElementById('f-email');
       if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em.value.trim())) return invalid(em);
-    }
-    if (step === 6) {
       var wh = document.getElementById('f-whatsapp');
       if (!wh) return invalid(wh);
       var tel = window.__fssPhone(wh.value, (document.getElementById('f-country-code') || {}).value);

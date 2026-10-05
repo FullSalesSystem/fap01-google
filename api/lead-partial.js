@@ -12,8 +12,16 @@ const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 20;
 const ipBucket = new Map();
 const SUPABASE_TABLE = 'fap_form';
-const LEAD_SOURCE = 'FAP01 - Sessão Estratégica';
-const TAGS_INCOMPLETO = ['form-incompleto', 'fap01-form-incompleto'];
+/* piso do SDR (40k desde 02/10/2026; 30k-50k = legado de página em cache) */
+const RECEITAS_PERFIL = new Set(['40k-50k', '30k-50k', '50k-100k', '100k-300k', '300k-500k', '500k-1m', 'acima-1m']);
+/* funil do parcial: FAP01 (padrão) ou a ficha do Treinamento/FAP04, que manda
+   `funil: 'treinamento'` via sendBeacon text/plain cross-origin (sem preflight,
+   resposta ignorada — mesmo esquema do /api/lead-treinamento). Treinamento
+   não grava no fap_form (tabela de abandono do FAP01). */
+const FUNIS = {
+  fap01: { source: 'FAP01 - Sessão Estratégica', tags: ['form-incompleto', 'fap01-form-incompleto'], fapForm: true },
+  treinamento: { source: 'FAP04 - Treinamento Comercial', tags: ['form-incompleto', 'treinamento-form-incompleto'], fapForm: false },
+};
 
 const SEGMENTO_LABELS = {
   saude: 'Saúde',
@@ -115,7 +123,7 @@ async function ghl(method, path, body) {
 
 /* Upsert SEM `tags` (tags no upsert substituem o conjunto inteiro do contato)
    e sem campo vazio (não apaga nome/telefone que o contato já tinha). */
-async function sendPartialToGhl({ nome, email, whatsapp }) {
+async function sendPartialToGhl({ nome, email, whatsapp }, funil, extraTags = []) {
   if (!process.env.GHL_PIT_TOKEN || !process.env.GHL_LOCATION_ID) return;
   const body = { locationId: process.env.GHL_LOCATION_ID };
   if (nome) {
@@ -132,8 +140,8 @@ async function sendPartialToGhl({ nome, email, whatsapp }) {
     return;
   }
   /* source só no contato novo: não reescreve a origem de quem já existia */
-  if (up.data.new) await ghl('PUT', `/contacts/${contactId}`, { source: LEAD_SOURCE });
-  await ghl('POST', `/contacts/${contactId}/tags`, { tags: TAGS_INCOMPLETO });
+  if (up.data.new) await ghl('PUT', `/contacts/${contactId}`, { source: funil.source });
+  await ghl('POST', `/contacts/${contactId}/tags`, { tags: funil.tags.concat(extraTags) });
   console.log('[ghl] partial ok', { contactId, novo: Boolean(up.data.new) });
 }
 
@@ -151,6 +159,7 @@ async function handler(req, res) {
     try { raw = JSON.parse(raw.toString('utf8')); } catch (_) { raw = {}; }
   }
   raw = raw || {};
+  const funil = FUNIS[raw.funil] || FUNIS.fap01;
 
   const segmentoSlug = sanitizeText(raw.segmento, 40);
   const cargoSlug    = sanitizeText(raw.cargo, 40);
@@ -162,6 +171,8 @@ async function handler(req, res) {
   const tel = fssPhone(sanitizeText(raw.whatsapp, 32));
   const whatsapp = tel.ok ? tel.full : '';
   const instagram = sanitizeText(raw.instagram, 60);
+
+  if (!funil.fapForm && !email && !whatsapp) { res.statusCode = 204; return res.end(); }
 
   if (!segmentoSlug && !cargoSlug && !receitaSlug && !nome && !emailRaw && !whatsapp) {
     return json(res, 400, { error: 'empty_payload' });
@@ -187,7 +198,7 @@ async function handler(req, res) {
     return json(res, 500, { error: 'server_not_configured' });
   }
 
-  if (raw.registrar !== false) {
+  if (funil.fapForm && raw.registrar !== false) {
     try {
       await sendToSupabase(supabaseUrl, supabaseKey, row);
     } catch (err) {
@@ -195,9 +206,19 @@ async function handler(req, res) {
     }
   }
 
+  /* Perfil do abandono vai pro GHL como tag (mesmo formato do /api/lead, que
+     limpa os valores velhos no submit completo): o time prioriza o sócio 40k+
+     que largou o form antes de agendar. Sem card nem SDR — régua do board. */
+  const extraTags = [];
+  if (funil === FUNIS.fap01) {
+    if (cargoSlug) extraTags.push(`cargo:${cargoSlug}`);
+    if (receitaSlug) extraTags.push(`receita:${receitaSlug}`);
+    if (cargoSlug === 'socio-empresario' && RECEITAS_PERFIL.has(receitaSlug)) extraTags.push('fap01-parcial-perfil');
+  }
+
   if (email || whatsapp) {
     try {
-      await sendPartialToGhl({ nome, email, whatsapp });
+      await sendPartialToGhl({ nome, email, whatsapp }, funil, extraTags);
     } catch (err) {
       console.error('[ghl] partial threw', { message: err && err.message });
     }

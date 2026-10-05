@@ -1365,7 +1365,7 @@
             <span class="v2-tab-num">4</span>
             <span class="v2-tab-label">Contato</span>
           </button>
-          <button type="button" class="wizard-tab" data-step="5" style="display:none;">
+          <button type="button" class="wizard-tab" data-step="5">
             <span class="v2-tab-num">5</span>
             <span class="v2-tab-label">Instagram</span>
           </button>
@@ -1373,7 +1373,7 @@
       </div>
 
       <div class="wizard-meta">
-        <span class="wizard-step-label">Passo 1 de 4</span>
+        <span class="wizard-step-label">Passo 1 de 5</span>
         <span class="wizard-time">~ 90 segundos</span>
       </div>
     </div>
@@ -1384,7 +1384,7 @@
 
         <!-- Step 1: Segmento -->
         <div class="wizard-step" id="wizard-step-1">
-          <div class="wizard-step-tag" data-label="segmento">Passo 1 de 4 · segmento</div>
+          <div class="wizard-step-tag" data-label="segmento">Passo 1 de 5 · segmento</div>
           <h2 class="wizard-step-title">Qual o segmento da sua empresa?</h2>
           <p class="wizard-step-desc">Você está aplicando pro <strong>Diagnóstico Comercial</strong>: uma reunião 1:1 com um especialista do nosso time sobre a sua operação.</p>
 
@@ -1429,7 +1429,7 @@
 
         <!-- Step 2: Perfil / Cargo -->
         <div class="wizard-step" id="wizard-step-2" hidden>
-          <div class="wizard-step-tag" data-label="perfil">Passo 2 de 4 · perfil</div>
+          <div class="wizard-step-tag" data-label="perfil">Passo 2 de 5 · perfil</div>
           <h2 class="wizard-step-title">Qual é o seu papel hoje na empresa?</h2>
           <p class="wizard-step-desc">Pra personalizar a reunião: falamos diferente com sócio do que com gerente.</p>
 
@@ -1459,7 +1459,7 @@
 
         <!-- Step 3: Qualificação / Receita -->
         <div class="wizard-step" id="wizard-step-3" hidden>
-          <div class="wizard-step-tag" data-label="qualificação">Passo 3 de 4 · qualificação</div>
+          <div class="wizard-step-tag" data-label="qualificação">Passo 3 de 5 · qualificação</div>
           <h2 class="wizard-step-title">Qual a receita média mensal da empresa?</h2>
           <p class="wizard-step-desc">Com essa resposta o especialista já chega na reunião sabendo qual dos nossos produtos faz sentido pra você.</p>
 
@@ -1504,35 +1504,18 @@
 
         <!-- Step 4: Nome -->
         <div class="wizard-step" id="wizard-step-4" hidden>
-          <div class="wizard-step-tag" data-label="contato">Passo 4 de 6 · contato</div>
-          <h2 class="wizard-step-title">Qual o seu nome?</h2>
-          <p class="wizard-step-desc">Pra gente saber como te chamar na reunião.</p>
+          <div class="wizard-step-tag" data-label="contato">Passo 4 de 5 · contato</div>
+          <h2 class="wizard-step-title">Pra quem a gente confirma a reunião?</h2>
+          <p class="wizard-step-desc">Se o seu perfil tiver fit, na próxima tela você já escolhe o horário da <strong>reunião com um especialista do nosso time</strong>. O time confirma o horário com você pelo WhatsApp. Zero spam.</p>
 
           <div class="form-field">
             <label for="f-nome">Nome completo <span class="req">*</span></label>
-            <input id="f-nome" name="nome" type="text" placeholder="Seu nome completo" required="" autocomplete="name">
+            <input id="f-nome" name="nome" type="text" placeholder="Seu nome completo" required="" autocomplete="name" enterkeyhint="next">
           </div>
-        </div>
-
-        <!-- Step 5: E-mail -->
-        <div class="wizard-step" id="wizard-step-5" hidden>
-          <div class="wizard-step-tag" data-label="contato">Passo 5 de 6 · contato</div>
-          <h2 class="wizard-step-title">Qual o seu melhor e-mail?</h2>
-          <p class="wizard-step-desc">É por ele que mandamos a confirmação da sua reunião.</p>
 
           <div class="form-field">
             <label for="f-email">E-mail <span class="req">*</span></label>
-            <input id="f-email" name="email" type="email" placeholder="seu@email.com" required="" autocomplete="email" inputmode="email">
-          </div>
-        </div>
-
-        <!-- Step 6: WhatsApp -->
-        <div class="wizard-step" id="wizard-step-6" hidden>
-          <div class="wizard-step-tag" data-label="contato">Passo 6 de 6 · contato</div>
-          <h2 class="wizard-step-title">Qual o seu WhatsApp?</h2>
-
-          <div class="wizard-info-box">
-            <p><strong>O que acontece agora:</strong> se o seu perfil tiver fit, na próxima tela você já escolhe o horário da <strong>reunião com um especialista do nosso time</strong>. Nela a gente olha sua operação de perto e mostra qual produto resolve o seu gargalo. O time confirma o horário com você por aqui, no WhatsApp. Zero spam.</p>
+            <input id="f-email" name="email" type="email" placeholder="seu@email.com" required="" autocomplete="email" inputmode="email" enterkeyhint="next">
           </div>
 
           <div class="form-field">
@@ -1552,7 +1535,7 @@
                 <option value="34">🇪🇸 +34</option>
                 <option value="44">🇬🇧 +44</option>
               </select>
-              <input id="f-whatsapp" name="whatsapp" type="tel" placeholder="(11) 99999-9999" required="">
+              <input id="f-whatsapp" name="whatsapp" type="tel" placeholder="(11) 99999-9999" required="" autocomplete="tel-national" inputmode="tel" enterkeyhint="go">
             </div>
             <p style="margin:6px 0 0;font-size:.78rem;color:#8a8aa0;">Fora do Brasil? Digite com +código do país</p>
           </div>
@@ -1560,7 +1543,7 @@
 
         <!-- Step 7: Instagram (entra no fluxo só pra receita 50k+) -->
         <div class="wizard-step" id="wizard-step-7" hidden>
-          <div class="wizard-step-tag" data-label="instagram">Passo 7 de 7 · instagram</div>
+          <div class="wizard-step-tag" data-label="instagram">Passo 5 de 5 · instagram</div>
           <h2 class="wizard-step-title">Qual o @ do seu Instagram?</h2>
           <p class="wizard-step-desc">O especialista estuda sua operação antes da reunião, então você não perde tempo explicando o básico.</p>
 
@@ -1607,7 +1590,7 @@
     </div>
   </div>
 
-  <script defer src="assets/produto.js?v=8"></script>
+  <script defer src="assets/produto.js?v=9"></script>
   <script defer src="assets/proof-setor.js?v=3"></script>
-  <script defer src="assets/v2.js?v=5"></script>
+  <script defer src="assets/v2.js?v=6"></script>
 </body></html>

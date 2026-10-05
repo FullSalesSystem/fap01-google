@@ -371,6 +371,12 @@ var formOpenedAt = Date.now();
         receita: receita,
         dor: dor
       });
+      /* Widget de agenda do GHL (form_embed.js repassa a query pro iframe):
+         first_name/phone pré-preenchem o form — sem eles a pessoa redigitava
+         nome e telefone depois de escolher o horário. O widget só tem campo
+         de primeiro nome (o nome completo já foi pro contato via /api/lead). */
+      redirectParams.set('first_name', nome.split(' ')[0]);
+      redirectParams.set('phone', tel.e164);
       if (instagram) redirectParams.set('instagram', instagram);
       UTM_KEYS.forEach(function(k) {
         if (utms[k]) redirectParams.set(k, utms[k]);
