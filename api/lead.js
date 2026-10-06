@@ -750,7 +750,10 @@ async function handler(req, res) {
       { name: 'Lead_qualificado_geral', id: payload.submission_id },
     );
   }
-  const capi = await metaCapi(req, {
+  /* Lead sintético (monitor de saúde, E2E): nada sai pro Meta nem pra 3C. Sem isso o
+     monitor mandava 1 Lead_qualificado_FAP01 falso por dia pra otimização das campanhas. */
+  const sintetico = payload.utm_source === 'e2e-check' || /\[TESTE/i.test(payload.nome);
+  const capi = sintetico ? 0 : await metaCapi(req, {
     nome: payload.nome, email: payload.email, telefone: payload.whatsapp,
     fbp: payload.fbp, fbc: payload.fbc, fbclid: payload.fbclid, url: payload.page,
   }, eventosMeta);
@@ -851,9 +854,8 @@ async function handler(req, res) {
 
         /* 3C Plus: qualificado/semi cai direto no ramal do SDR da aplicação.
            A tag diz ao time se a ligação saiu ou se o SDR estava indisponível. */
-        /* Lead sintético (monitor de saúde, E2E) nunca liga: o telefone é inventado
-           e a 3C discaria um número que pode ser de uma pessoa real. */
-        const sintetico = payload.utm_source === 'e2e-check' || /\[TESTE/i.test(payload.nome);
+        /* sintético nunca liga: o telefone é inventado e a 3C discaria um número
+           que pode ser de uma pessoa real */
         const call = sintetico ? { ok: false, status: 'nao_configurado' } : await click2call(payload.whatsapp.replace(/\D/g, ''));
         if (call.status !== 'nao_configurado') {
           await addContactTags(ghlBaseUrl, pitToken, contactId, [call.ok ? '3c-ligacao-disparada' : '3c-ramal-indisponivel']);
