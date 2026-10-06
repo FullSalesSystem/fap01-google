@@ -231,6 +231,7 @@ var formOpenedAt = Date.now();
        Instagram, o lead NÃO se perde. Fase 2: o envio final manda só
        o @ pro /api/lead-instagram, que atualiza contato + linha. */
     var leadCapturado = null; // { submission_id, submitted_at, email, whatsapp }
+    var leadResposta = null;  // Promise com o JSON do /api/lead da fase 1 (traz `ligacao` da 3C Plus)
 
     function coletarContato() {
       var tel = fssPhone(document.getElementById('f-whatsapp').value, document.getElementById('f-country-code').value);
@@ -296,12 +297,12 @@ var formOpenedAt = Date.now();
       leadCapturado = { submission_id: submissionId, submitted_at: submittedAt, email: c.email, whatsapp: c.whatsapp };
 
       try {
-        fetch('/api/lead', {
+        leadResposta = fetch('/api/lead', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           keepalive: true,
-        }).catch(function () {});
+        }).then(function (r) { return r.json(); }).catch(function () { return null; });
       } catch (_) {}
 
       return true;
@@ -455,10 +456,20 @@ var formOpenedAt = Date.now();
         });
       }
 
+      /* Se a 3C Plus disparou a ligação, a obrigado-final mostra "o <SDR> está te
+         ligando agora". Só promete quando a API confirmou (ligacao != null). */
+      var resposta = leadCapturado
+        ? (leadResposta || Promise.resolve(null))
+        : request.then(function (r) { return r.json(); }).catch(function () { return null; });
       Promise.race([
-        request,
-        new Promise(function(resolve) { setTimeout(resolve, 2500); })
-      ]).finally(function () {
+        Promise.all([Promise.resolve(request).catch(function () {}), resposta]).then(function (x) { return x[1]; }),
+        new Promise(function(resolve) { setTimeout(function () { resolve(null); }, 4000); })
+      ]).then(function (j) {
+        if (j && j.ligacao) {
+          redirectParams.set('ligando', '1');
+          if (j.ligacao.sdr) redirectParams.set('sdr', j.ligacao.sdr);
+        }
+      }).catch(function () {}).finally(function () {
         safeRedirect(redirectUrl + '?' + redirectParams.toString());
       });
     }

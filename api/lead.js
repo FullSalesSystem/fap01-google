@@ -1,4 +1,5 @@
 const fssPhone = require('./_fss-phone.js');
+const click2call = require('./_click2call.js');
 const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 10;
 const ipBucket = new Map();
@@ -741,6 +742,7 @@ async function handler(req, res) {
     fbp: payload.fbp, fbc: payload.fbc, fbclid: payload.fbclid, url: payload.page,
   }, eventosMeta);
 
+  let ligacao = null; /* { sdr } quando a 3C Plus disparou a ligação */
   try {
     const classificacao = classifyLead(payload.cargo, payload.receita);
     const { response, data } = await sendToHighLevel(ghlBaseUrl, pitToken, locationId, payload);
@@ -828,10 +830,19 @@ async function handler(req, res) {
         await removeContactTags(ghlBaseUrl, pitToken, contactId, ['fap1-cadastro-trigger']);
         await addContactTags(ghlBaseUrl, pitToken, contactId, ['fap1-cadastro-trigger']);
         console.log('[ghl] trigger tag re-armed', { contactId });
+
+        /* 3C Plus: qualificado/semi cai direto no ramal do SDR da aplicação.
+           A tag diz ao time se a ligação saiu ou se o SDR estava indisponível. */
+        const call = await click2call(payload.whatsapp.replace(/\D/g, ''));
+        if (call.status !== 'nao_configurado') {
+          await addContactTags(ghlBaseUrl, pitToken, contactId, [call.ok ? '3c-ligacao-disparada' : '3c-ramal-indisponivel']);
+        }
+        if (call.ok) ligacao = { sdr: call.sdr || '' };
+        console.log('[3c] click2call', { contactId, status: call.status });
       }
     }
 
-    return json(res, 202, { ok: true, classificacao, capi });
+    return json(res, 202, { ok: true, classificacao, capi, ligacao });
   } catch (_) {
     return json(res, 502, { error: 'upstream_unreachable' });
   }
