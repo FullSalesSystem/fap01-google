@@ -856,12 +856,19 @@ async function handler(req, res) {
            A tag diz ao time se a ligação saiu ou se o SDR estava indisponível. */
         /* sintético nunca liga: o telefone é inventado e a 3C discaria um número
            que pode ser de uma pessoa real */
-        const call = sintetico ? { ok: false, status: 'nao_configurado' } : await click2call(payload.whatsapp.replace(/\D/g, ''));
+        const fone = payload.whatsapp.replace(/\D/g, '');
+        const call = sintetico ? { ok: false, status: 'nao_configurado' } : await click2call(fone);
+        /* ligação direta falhou (SDR ocupado/fora): entra na fila da campanha da 3C */
+        const fila = (!call.ok && call.status !== 'nao_configurado')
+          ? await click2call.enfileirar(fone, payload.nome) : { ok: false, status: 'nao_configurado' };
         if (call.status !== 'nao_configurado') {
-          await addContactTags(ghlBaseUrl, pitToken, contactId, [call.ok ? '3c-ligacao-disparada' : '3c-ramal-indisponivel']);
+          const tag = call.ok ? '3c-ligacao-disparada' : fila.ok ? '3c-fila-campanha' : '3c-ramal-indisponivel';
+          await addContactTags(ghlBaseUrl, pitToken, contactId, [tag]);
         }
-        if (call.ok) ligacao = { sdr: call.sdr || '' };
-        console.log('[3c] click2call', { contactId, status: call.status });
+        const sdrNome = process.env.DIALER_SDR_NOME || '';
+        if (call.ok) ligacao = { sdr: call.sdr || sdrNome, agora: true };
+        else if (fila.ok && click2call.campanhaNoHorario()) ligacao = { sdr: sdrNome, agora: false };
+        console.log('[3c] click2call', { contactId, status: call.status, fila: fila.status });
       }
     }
 

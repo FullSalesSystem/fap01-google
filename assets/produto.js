@@ -466,7 +466,7 @@ var formOpenedAt = Date.now();
         new Promise(function(resolve) { setTimeout(function () { resolve(null); }, 4000); })
       ]).then(function (j) {
         if (j && j.ligacao) {
-          redirectParams.set('ligando', '1');
+          redirectParams.set(j.ligacao.agora ? 'ligando' : 'fila', '1');
           if (j.ligacao.sdr) redirectParams.set('sdr', j.ligacao.sdr);
         }
       }).catch(function () {}).finally(function () {
