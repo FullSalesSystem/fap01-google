@@ -492,7 +492,19 @@ async function updateContactSource(ghlBaseUrl, pitToken, contactId) {
   return response.ok;
 }
 
-async function createOpportunity(ghlBaseUrl, pitToken, locationId, contactId, name, pipelineId, stageId) {
+/* SDR fixo da aplicação (06/10/2026): contato e card nascem atribuídos a ele,
+   ANTES de a tag de trigger rodar o workflow de rodízio. */
+async function assignTo(ghlBaseUrl, pitToken, path, userId) {
+  const response = await fetch(`${ghlBaseUrl.replace(/\/+$/, '')}/${path}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${pitToken}`, Accept: 'application/json', Version: '2021-07-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignedTo: userId }),
+  });
+  if (!response.ok) console.error('[ghl] assign failed', { path: path.split('/')[0], status: response.status });
+  return response.ok;
+}
+
+async function createOpportunity(ghlBaseUrl, pitToken, locationId, contactId, name, pipelineId, stageId, assignedTo) {
   const endpoint = `${ghlBaseUrl.replace(/\/+$/, '')}/opportunities/`;
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -510,6 +522,7 @@ async function createOpportunity(ghlBaseUrl, pitToken, locationId, contactId, na
       status: 'open',
       name,
       source: LEAD_SOURCE,
+      ...(assignedTo ? { assignedTo } : {}),
     }),
   });
 
@@ -805,6 +818,11 @@ async function handler(req, res) {
         console.log('[ghl] desqualificado fora do pipeline de SDR', { contactId });
       } else {
         const existingPreSalesOpp = opportunities.find((op) => op.pipelineId === PRE_SALES_PIPELINE_ID);
+        const sdrAplicacao = process.env.GHL_SDR_APLICACAO || '';
+        if (sdrAplicacao) {
+          await assignTo(ghlBaseUrl, pitToken, `contacts/${contactId}`, sdrAplicacao);
+          if (existingPreSalesOpp) await assignTo(ghlBaseUrl, pitToken, `opportunities/${existingPreSalesOpp.id}`, sdrAplicacao);
+        }
 
         if (existingPreSalesOpp) {
           if (
@@ -819,7 +837,7 @@ async function handler(req, res) {
         } else {
           await createOpportunity(
             ghlBaseUrl, pitToken, locationId, contactId, payload.nome,
-            PRE_SALES_PIPELINE_ID, PRE_SALES_STAGE_FUNIL_APLICACAO_ID,
+            PRE_SALES_PIPELINE_ID, PRE_SALES_STAGE_FUNIL_APLICACAO_ID, sdrAplicacao,
           );
         }
 
@@ -833,7 +851,10 @@ async function handler(req, res) {
 
         /* 3C Plus: qualificado/semi cai direto no ramal do SDR da aplicação.
            A tag diz ao time se a ligação saiu ou se o SDR estava indisponível. */
-        const call = await click2call(payload.whatsapp.replace(/\D/g, ''));
+        /* Lead sintético (monitor de saúde, E2E) nunca liga: o telefone é inventado
+           e a 3C discaria um número que pode ser de uma pessoa real. */
+        const sintetico = payload.utm_source === 'e2e-check' || /\[TESTE/i.test(payload.nome);
+        const call = sintetico ? { ok: false, status: 'nao_configurado' } : await click2call(payload.whatsapp.replace(/\D/g, ''));
         if (call.status !== 'nao_configurado') {
           await addContactTags(ghlBaseUrl, pitToken, contactId, [call.ok ? '3c-ligacao-disparada' : '3c-ramal-indisponivel']);
         }

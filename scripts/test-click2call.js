@@ -6,13 +6,14 @@ process.env.GHL_LOCATION_ID = 'LOC';
 process.env.DIALER_BASE_URL = 'https://fullsales.3c.plus';
 process.env.DIALER_TOKEN = 'tok';
 process.env.DIALER_RAMAL_APLICACAO = '1007';
+process.env.GHL_SDR_APLICACAO = 'RAUL';
 delete process.env.SUPABASE_URL;
 const handler = require('../api/lead.js');
 
-async function run(receita, ip, status3c = 200) {
+async function run(receita, ip, status3c = 200, utm = '') {
   const calls = [];
   global.fetch = async (url, opts) => {
-    calls.push({ url, body: opts && opts.body });
+    calls.push({ url, method: (opts && opts.method) || 'GET', body: opts && opts.body });
     if (url.includes('3c.plus')) return { ok: status3c < 300, status: status3c, json: async () => ({ data: { call: { id: 'x' }, agent: { name: 'Raul Fernandez' } } }) };
     if (url.includes('/contacts/upsert')) return { ok: true, status: 200, json: async () => ({ contact: { id: 'C1' } }) };
     if (url.includes('/opportunities/search')) return { ok: true, status: 200, json: async () => ({ opportunities: [] }) };
@@ -23,10 +24,11 @@ async function run(receita, ip, status3c = 200) {
     submission_id: 'testsubmission1', submitted_at: new Date().toISOString(), page: 'https://fap01.fullsalessystem.com/',
     nome: 'Fulano Teste', email: 'fulano@example.com', whatsapp: '+55 11974253168',
     cargo: 'socio-empresario', segmento: 'outro', receita, dor: '', instagram: '',
-    utm_source: '', utm_medium: '', utm_campaign: '', utm_content: '', utm_term: '' } }, res);
+    utm_source: utm, utm_medium: '', utm_campaign: '', utm_content: '', utm_term: '' } }, res);
   const dial = calls.filter((c) => c.url.includes('3c.plus'));
   const tags = calls.filter((c) => c.url.endsWith('/contacts/C1/tags') && c.body).map((c) => JSON.parse(c.body).tags).flat();
-  return { dial, tags, body: JSON.parse(res.body) };
+  const assigns = calls.filter((c) => c.body && typeof c.body === 'string' && c.body.includes('"assignedTo":"RAUL"')).map((c) => c.url.replace(/.*\.com\//, '').split('/')[0]);
+  return { dial, tags, body: JSON.parse(res.body), assigns };
 }
 
 (async () => {
@@ -40,7 +42,12 @@ async function run(receita, ip, status3c = 200) {
   assert.strictEqual(s.dial.length, 1, 'semi liga 1x');
   assert.ok(s.tags.includes('3c-ramal-indisponivel'), '422 = ramal indisponível');
   assert.strictEqual(s.body.ligacao, null, 'sem ligação, página não promete');
+  assert.deepStrictEqual(q.assigns.sort(), ['contacts', 'opportunities'], 'qualificado: contato e card do Raul');
+  assert.deepStrictEqual(s.assigns.sort(), ['contacts', 'opportunities'], 'semi: contato e card do Raul');
   const d = await run('abaixo-40k', 'ip-d');
+  assert.strictEqual(d.assigns.length, 0, 'desqualificado não vai pro Raul');
   assert.strictEqual(d.dial.length, 0, 'desqualificado nunca liga');
+  const e = await run('50k-100k', 'ip-e', 200, 'e2e-check');
+  assert.strictEqual(e.dial.length, 0, 'lead do monitor/E2E nunca liga');
   console.log('ok — click2call só pra qualificado/semi');
 })();
