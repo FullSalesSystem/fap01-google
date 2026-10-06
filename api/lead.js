@@ -856,19 +856,16 @@ async function handler(req, res) {
            A tag diz ao time se a ligação saiu ou se o SDR estava indisponível. */
         /* sintético nunca liga: o telefone é inventado e a 3C discaria um número
            que pode ser de uma pessoa real */
-        const fone = payload.whatsapp.replace(/\D/g, '');
-        const call = sintetico ? { ok: false, status: 'nao_configurado' } : await click2call(fone);
-        /* ligação direta falhou (SDR ocupado/fora): entra na fila da campanha da 3C */
-        const fila = (!call.ok && call.status !== 'nao_configurado')
-          ? await click2call.enfileirar(fone, payload.nome) : { ok: false, status: 'nao_configurado' };
-        if (call.status !== 'nao_configurado') {
-          const tag = call.ok ? '3c-ligacao-disparada' : fila.ok ? '3c-fila-campanha' : '3c-ramal-indisponivel';
-          await addContactTags(ghlBaseUrl, pitToken, contactId, [tag]);
+        /* Desde 06/10/2026 todo qualificado/semi entra na fila da Campanha ativa LP
+           aplicação da 3C (decisão do Matheus): o discador liga quando o SDR estiver
+           livre, no horário da campanha. Sem ligação direta, sem risco de ligar 2x. */
+        const fila = sintetico ? { ok: false, status: 'nao_configurado' }
+          : await click2call.enfileirar(payload.whatsapp.replace(/\D/g, ''), payload.nome);
+        if (fila.status !== 'nao_configurado') {
+          await addContactTags(ghlBaseUrl, pitToken, contactId, [fila.ok ? '3c-fila-campanha' : '3c-fila-falhou']);
         }
-        const sdrNome = process.env.DIALER_SDR_NOME || '';
-        if (call.ok) ligacao = { sdr: call.sdr || sdrNome, agora: true };
-        else if (fila.ok && click2call.campanhaNoHorario()) ligacao = { sdr: sdrNome, agora: false };
-        console.log('[3c] click2call', { contactId, status: call.status, fila: fila.status });
+        if (fila.ok && click2call.campanhaNoHorario()) ligacao = { sdr: process.env.DIALER_SDR_NOME || '', agora: false };
+        console.log('[3c] fila campanha', { contactId, status: fila.status });
       }
     }
 

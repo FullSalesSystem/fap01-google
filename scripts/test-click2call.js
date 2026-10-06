@@ -1,24 +1,24 @@
-/* 3C Plus: só qualificado/semi disparam click2call no ramal da aplicação; desqualificado nunca.
+/* 3C Plus: todo qualificado/semi entra na fila da campanha da LP de aplicação; desqualificado
+   e lead sintético nunca. Contato e card nascem com o SDR da aplicação.
    Roda com `node scripts/test-click2call.js` (fetch stubado). */
 const assert = require('assert');
 process.env.GHL_PIT_TOKEN = 'pit-test';
 process.env.GHL_LOCATION_ID = 'LOC';
 process.env.DIALER_BASE_URL = 'https://fullsales.3c.plus';
 process.env.DIALER_TOKEN = 'tok';
-process.env.DIALER_RAMAL_APLICACAO = '1007';
-process.env.GHL_SDR_APLICACAO = 'RAUL';
 process.env.DIALER_CAMPANHA_APLICACAO = '322705';
 process.env.DIALER_LISTA_APLICACAO = '4946059';
 process.env.DIALER_SDR_NOME = 'Raul';
+process.env.GHL_SDR_APLICACAO = 'RAUL';
 delete process.env.SUPABASE_URL;
 const handler = require('../api/lead.js');
+const { campanhaNoHorario } = require('../api/_click2call.js');
 
-async function run(receita, ip, status3c = 200, utm = '') {
+async function run(receita, ip, utm = '', status3c = 200) {
   const calls = [];
   global.fetch = async (url, opts) => {
     calls.push({ url, method: (opts && opts.method) || 'GET', body: opts && opts.body });
-    if (url.includes('mailing.json')) return { ok: true, status: 200, json: async () => ({}) };
-    if (url.includes('3c.plus')) return { ok: status3c < 300, status: status3c, json: async () => ({ data: { call: { id: 'x' }, agent: { name: 'Raul Fernandez' } } }) };
+    if (url.includes('3c.plus')) return { ok: status3c < 300, status: status3c, json: async () => ({}) };
     if (url.includes('/contacts/upsert')) return { ok: true, status: 200, json: async () => ({ contact: { id: 'C1' } }) };
     if (url.includes('/opportunities/search')) return { ok: true, status: 200, json: async () => ({ opportunities: [] }) };
     return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
@@ -31,31 +31,27 @@ async function run(receita, ip, status3c = 200, utm = '') {
     utm_source: utm, utm_medium: '', utm_campaign: '', utm_content: '', utm_term: '' } }, res);
   const dial = calls.filter((c) => c.url.includes('3c.plus'));
   const tags = calls.filter((c) => c.url.endsWith('/contacts/C1/tags') && c.body).map((c) => JSON.parse(c.body).tags).flat();
-  const assigns = calls.filter((c) => c.body && typeof c.body === 'string' && c.body.includes('"assignedTo":"RAUL"')).map((c) => c.url.replace(/.*\.com\//, '').split('/')[0]);
-  return { dial, tags, body: JSON.parse(res.body), assigns };
+  const assigns = calls.filter((c) => typeof c.body === 'string' && c.body.includes('"assignedTo":"RAUL"')).map((c) => c.url.replace(/.*\.com\//, '').split('/')[0]);
+  return { dial, tags, assigns, body: JSON.parse(res.body) };
 }
 
 (async () => {
-  const q = await run('100k-300k', 'ip-q');
-  assert.strictEqual(q.dial.length, 1, 'qualificado liga 1x');
-  assert.ok(q.dial[0].url.endsWith('/api/v1/click2call'));
-  assert.strictEqual(q.dial[0].body, 'extension=1007&phone=5511974253168');
-  assert.ok(q.tags.includes('3c-ligacao-disparada'));
-  assert.deepStrictEqual(q.body.ligacao, { sdr: 'Raul', agora: true }, 'API devolve o SDR que está ligando');
-  assert.ok(!q.dial.some((c) => c.url.includes('mailing')), 'ligou direto: não entra na fila');
-  const s = await run('40k-50k', 'ip-s', 422);
-  const filaS = s.dial.filter((c) => c.url.endsWith('/campaigns/322705/lists/4946059/mailing.json'));
-  assert.strictEqual(filaS.length, 1, 'ramal ocupado: lead vai pra fila da campanha');
-  assert.deepStrictEqual(JSON.parse(filaS[0].body), [{ phone: '11974253168', identifier: 'Fulano Teste' }]);
-  assert.ok(s.tags.includes('3c-fila-campanha'));
-  const noHorario = require('../api/_click2call.js').campanhaNoHorario();
-  assert.deepStrictEqual(s.body.ligacao, noHorario ? { sdr: 'Raul', agora: false } : null, 'fila: promete só no horário da campanha');
-  assert.deepStrictEqual(q.assigns.sort(), ['contacts', 'opportunities'], 'qualificado: contato e card do Raul');
-  assert.deepStrictEqual(s.assigns.sort(), ['contacts', 'opportunities'], 'semi: contato e card do Raul');
+  const promessa = campanhaNoHorario() ? { sdr: 'Raul', agora: false } : null;
+  for (const receita of ['100k-300k', '40k-50k']) {
+    const r = await run(receita, 'ip-' + receita);
+    assert.strictEqual(r.dial.length, 1, receita + ': 1 chamada à 3C');
+    assert.ok(r.dial[0].url.endsWith('/campaigns/322705/lists/4946059/mailing.json'), 'vai pra fila, não click2call');
+    assert.deepStrictEqual(JSON.parse(r.dial[0].body), [{ phone: '11974253168', identifier: 'Fulano Teste' }]);
+    assert.ok(r.tags.includes('3c-fila-campanha'));
+    assert.deepStrictEqual(r.body.ligacao, promessa, 'página só promete no horário da campanha');
+    assert.deepStrictEqual(r.assigns.sort(), ['contacts', 'opportunities'], 'contato e card do Raul');
+  }
+  const f = await run('50k-100k', 'ip-f', '', 500);
+  assert.ok(f.tags.includes('3c-fila-falhou') && f.body.ligacao === null, 'fila falhou: tag e sem promessa');
   const d = await run('abaixo-40k', 'ip-d');
+  assert.strictEqual(d.dial.length, 0, 'desqualificado nunca entra');
   assert.strictEqual(d.assigns.length, 0, 'desqualificado não vai pro Raul');
-  assert.strictEqual(d.dial.length, 0, 'desqualificado nunca liga');
-  const e = await run('50k-100k', 'ip-e', 200, 'e2e-check');
-  assert.strictEqual(e.dial.length, 0, 'lead do monitor/E2E nunca liga');
-  console.log('ok — click2call só pra qualificado/semi');
+  const e = await run('50k-100k', 'ip-e', 'e2e-check');
+  assert.strictEqual(e.dial.length, 0, 'lead do monitor/E2E nunca entra');
+  console.log('ok — qualificado/semi entram na fila da campanha da 3C');
 })();
