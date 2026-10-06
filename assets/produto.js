@@ -349,10 +349,16 @@ var formOpenedAt = Date.now();
       var submissionId = createSubmissionId();
 
       var redirectUrl;
+      /* Desde 06/10/2026 qualificado e semi não passam mais pela agenda (travava):
+         vão direto pra obrigado-final (vídeo + "pular a fila"); o SDR marca a
+         reunião. `perfil` diz à página quais eventos do pixel disparar. */
+      var perfil = '';
       if (isEligibleCargo && isHighRevenue) {
-        redirectUrl = 'https://fap01-calendly.fullsalessystem.com';
+        perfil = 'qualificado';
+        redirectUrl = 'https://fap01-obrigado-final.fullsalessystem.com/';
       } else if (isEligibleCargo && isSemiRevenue) {
-        redirectUrl = 'https://fap01-calendly-semi.fullsalessystem.com';
+        perfil = 'semi';
+        redirectUrl = 'https://fap01-obrigado-final.fullsalessystem.com/';
       } else {
         redirectUrl = 'https://fap01-obrigado-lf.fullsalessystem.com';
       }
@@ -378,6 +384,7 @@ var formOpenedAt = Date.now();
       redirectParams.set('first_name', nome.split(' ')[0]);
       redirectParams.set('phone', tel.e164);
       if (instagram) redirectParams.set('instagram', instagram);
+      if (perfil) redirectParams.set('perfil', perfil);
       UTM_KEYS.forEach(function(k) {
         if (utms[k]) redirectParams.set(k, utms[k]);
       });
