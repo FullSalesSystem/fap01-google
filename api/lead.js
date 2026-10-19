@@ -1,5 +1,7 @@
 const fssPhone = require('./_fss-phone.js');
 const click2call = require('./_click2call.js');
+const registro = require('./_lead-registro.js');
+const REGISTRO_SOURCE = 'fap01google'; /* conector CaptureV1 · fap01google · complete */
 const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 10;
 const ipBucket = new Map();
@@ -275,8 +277,7 @@ function buildGhlPayload(payload, locationId) {
   return body;
 }
 
-async function sendToSupabase(supabaseUrl, supabaseKey, payload) {
-  const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/rest/v1/${encodeURIComponent(SUPABASE_TABLE)}`;
+async function sendToSupabase(supabaseUrl, supabaseKey, payload, capture) {
   const row = {
     nome: payload.nome,
     email: payload.email,
@@ -306,29 +307,11 @@ async function sendToSupabase(supabaseUrl, supabaseKey, payload) {
      existir na tabela, o PostgREST rejeitaria o insert inteiro (PGRST204) */
   if (payload.instagram) row.instagram = payload.instagram;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(row),
+  /* Supabase primeiro: [Leads] FAP01 (com capture_key) + lead_capturas, em paralelo */
+  const { lead } = await registro.gravarSupabase({
+    url: supabaseUrl, key: supabaseKey, table: SUPABASE_TABLE, row, capture, source: REGISTRO_SOURCE,
   });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '');
-    console.error('[supabase] insert failed', {
-      status: response.status,
-      endpoint,
-      error: errorBody.slice(0, 500),
-    });
-  } else {
-    console.log('[supabase] insert ok', { status: response.status });
-  }
-
-  return { ok: response.ok, status: response.status };
+  return { ok: lead.ok, status: lead.status };
 }
 
 async function sendToHighLevel(ghlBaseUrl, pitToken, locationId, payload) {
@@ -710,11 +693,19 @@ async function handler(req, res) {
     page: payload.page.slice(0, 200),
   });
 
+  /* Corpo capture v1 de registro, montado UMA vez (Supabase e CRM recebem o mesmo objeto) */
+  let capture = null;
+  try {
+    capture = registro.buildCapture(rawBody, payload, { role: payload.cargo, segment: payload.segmento, revenue: payload.receita });
+  } catch (err) {
+    console.error('[registro] capture nao montado', { message: err && err.message });
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (supabaseUrl && supabaseKey) {
     try {
-      const supaResult = await sendToSupabase(supabaseUrl, supabaseKey, payload);
+      const supaResult = await sendToSupabase(supabaseUrl, supabaseKey, payload, capture);
       console.log('[supabase] result', { ok: supaResult.ok, status: supaResult.status });
     } catch (err) {
       console.error('[supabase] threw', { message: err && err.message });
@@ -725,6 +716,11 @@ async function handler(req, res) {
       hasKey: Boolean(supabaseKey),
     });
   }
+
+  /* Registro no CRM (create_deal=false): corre junto com o GHL e é esperado só
+     antes de responder, com teto de 3 s. Falha nunca muda a resposta ao lead. */
+  const registroCrm = registro.registrarNoCrm(capture);
+  const responder = async (status, data) => { await registroCrm; return json(res, status, data); };
 
   /* Meta CAPI — espelha o que as paginas de destino disparam no pixel:
        desqualificado (fap01-obrigado-lf): Lead_desqualificado_FAP01 +
@@ -763,7 +759,7 @@ async function handler(req, res) {
     const classificacao = classifyLead(payload.cargo, payload.receita);
     const { response, data } = await sendToHighLevel(ghlBaseUrl, pitToken, locationId, payload);
 
-    if (!response.ok) return json(res, 502, { error: 'upstream_rejected' });
+    if (!response.ok) return responder(502, { error: 'upstream_rejected' });
     const contactId = data?.contact?.id;
 
     if (contactId) {
@@ -869,9 +865,9 @@ async function handler(req, res) {
       }
     }
 
-    return json(res, 202, { ok: true, classificacao, capi, ligacao });
+    return responder(202, { ok: true, classificacao, capi, ligacao });
   } catch (_) {
-    return json(res, 502, { error: 'upstream_unreachable' });
+    return responder(502, { error: 'upstream_unreachable' });
   }
 }
 
